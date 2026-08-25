@@ -9,6 +9,7 @@ Runs on a schedule via GitHub Actions - see .github/workflows/sync.yml
 No paid service is involved anywhere in this pipeline.
 """
 
+import hashlib
 import os
 import re
 import sys
@@ -17,6 +18,22 @@ from datetime import datetime, date
 from pathlib import Path
 
 import requests
+
+# A private, unguessable suffix mixed into every filename, so links can't be
+# derived just by knowing someone's name - even by someone reading this
+# script, since the actual value is never stored here. It must be supplied
+# as the FILENAME_SALT secret (see .github/workflows/sync.yml). Without it
+# set, the script refuses to run rather than silently using a public value.
+FILENAME_SALT = os.environ.get("FILENAME_SALT")
+if not FILENAME_SALT:
+    print(
+        "FILENAME_SALT is not set. Refusing to run: without a private salt, "
+        "filenames would be guessable from names alone. Add a FILENAME_SALT "
+        "repository secret in GitHub (Settings -> Secrets and variables -> "
+        "Actions) and re-run.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 DATABASE_ID = os.environ["NOTION_DATABASE_ID"]
@@ -189,22 +206,18 @@ def main():
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    index_lines = [
-        "# Carlam Schedule - subscription links",
-        "",
-        "Copy your link below and add it in Outlook as: Add calendar -> Subscribe from web.",
-        "",
-    ]
-
+    # No index/README is written here on purpose - listing everyone's name and
+    # filename on the public site would be the one thing pointing people at
+    # each other's calendar links. Keeping the docs folder free of any index
+    # means the only way to find a link is if you were personally given it.
     for person, person_rows in sorted(by_person.items()):
         slug = slugify(person)
+        suffix = hashlib.sha256(f"{FILENAME_SALT}:{person}".encode()).hexdigest()[:8]
         ics_content = build_calendar(person, person_rows)
-        out_path = OUTPUT_DIR / f"{slug}.ics"
+        out_path = OUTPUT_DIR / f"{slug}-{suffix}.ics"
         out_path.write_text(ics_content, encoding="utf-8")
         print(f"Wrote {out_path} ({len(person_rows)} events) for {person}")
-        index_lines.append(f"- **{person}**: `{slug}.ics`")
 
-    (OUTPUT_DIR / "README.md").write_text("\n".join(index_lines) + "\n", encoding="utf-8")
     (OUTPUT_DIR / ".nojekyll").write_text("", encoding="utf-8")
 
     print("Done.")
