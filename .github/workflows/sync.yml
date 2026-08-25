@@ -2,7 +2,7 @@ name: Sync Notion schedule to calendar feeds
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+     - cron: "*/5 * * * *"
   workflow_dispatch: {}
   push:
     branches: [ main ]
