@@ -2,8 +2,11 @@ name: Sync Notion schedule to calendar feeds
 
 on:
   schedule:
-     - cron: "*/5 * * * *"
-  workflow_dispatch: {}
+    # Runs every 30 minutes. GitHub Actions free tier gives 2,000 minutes/month
+    # on private repos and unlimited minutes on public repos - this uses only
+    # a fraction of a minute per run, so it stays free indefinitely.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}   # lets you trigger a manual run/test from the Actions tab
   push:
     branches: [ main ]
 
@@ -29,6 +32,7 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          FILENAME_SALT: ${{ secrets.FILENAME_SALT }}
         run: python generate_ics.py
 
       - name: Commit updated feeds
