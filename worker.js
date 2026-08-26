@@ -250,4 +250,42 @@ export default {
 
     return env.ASSETS.fetch(request);
   },
+
+  // Runs on Cloudflare's own reliable Cron Trigger (see wrangler.jsonc),
+  // every 5 minutes. GitHub's own "schedule:" trigger in sync.yml is
+  // documented as best-effort and can silently drift by 20-40+ minutes, so
+  // instead this pings GitHub's API to fire the same workflow on demand
+  // (workflow_dispatch), which - unlike the schedule trigger - runs
+  // promptly every time, since it's treated as a normal on-demand request
+  // rather than being queued in GitHub's deprioritised scheduler.
+  //
+  // Requires a GITHUB_PAT secret set in this Worker's environment
+  // (Cloudflare dashboard -> this Worker -> Settings -> Variables and
+  // Secrets -> Add -> name it GITHUB_PAT, type Secret), a GitHub fine-
+  // grained token scoped to just this repo with Actions: Read and write.
+  async scheduled(controller, env, ctx) {
+    if (!env.GITHUB_PAT) {
+      console.error("GITHUB_PAT secret is not set - cannot trigger sync workflow.");
+      return;
+    }
+
+    const resp = await fetch(
+      "https://api.github.com/repos/iestyn-carlam/carlam-schedule/actions/workflows/sync.yml/dispatches",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_PAT}`,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+          "User-Agent": "carlam-schedule-worker",
+        },
+        body: JSON.stringify({ ref: "main" }),
+      }
+    );
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error(`Failed to trigger sync workflow: ${resp.status} ${text}`);
+    }
+  },
 };
