@@ -45,7 +45,7 @@ OUTPUT_DIR = Path(__file__).parent / "docs"
 
 # The full list of teams. Must match the options on the "Team" select field
 # in Notion exactly (case-sensitive).
-TEAMS = ["Corporate", "Kids", "Digital", "Technical", "Admin", "Factual"]
+TEAMS = ["Corporate", "Children", "Digital", "Technical", "Admin", "Factual"]
 
 AUTO_REFRESH_SECONDS = 120
 
