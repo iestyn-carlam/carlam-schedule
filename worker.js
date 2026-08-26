@@ -43,7 +43,7 @@ const MASTER_FILE = "schedule-master-6bc54781.html";
 // (or not logged in) sees a plain "no schedules assigned" message.
 const ACCESS_MAP = {
   "iestyn@carlamltd.com": "ALL",
-  // "jason@carlamltd.com": ["Kids"],
+  "wil@carlamltd.com": ["Digital", "Corporate", "Admin"],
   // "someone.else@carlamltd.com": ["Digital", "Technical"],
 };
 
