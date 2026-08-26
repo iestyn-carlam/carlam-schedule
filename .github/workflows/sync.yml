@@ -42,6 +42,13 @@ jobs:
           FILENAME_SALT: ${{ secrets.FILENAME_SALT }}
         run: python generate_grid.py
 
+      - name: Generate schedule webpage
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          FILENAME_SALT: ${{ secrets.FILENAME_SALT }}
+        run: python generate_webpage.py
+
       - name: Commit updated feeds
         run: |
           git config user.name "carlam-schedule-bot"
