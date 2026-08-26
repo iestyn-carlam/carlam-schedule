@@ -1,31 +1,19 @@
 /**
- * Intercepts requests to the homepage and builds a personalized list of
- * schedule links based on who's actually logged in (read from the
+ * Intercepts requests to the homepage and builds a personalized, styled
+ * list of schedule links based on who's actually logged in (read from the
  * Cloudflare Access login), instead of showing every team to everyone.
  *
  * Every other file (the actual team pages, calendars, spreadsheet) is left
  * completely alone and served as a normal static file - and, importantly,
  * each of those pages is STILL independently protected by its own
  * Cloudflare Access policy. This script only changes what's *displayed* on
- * the homepage menu; it is not what makes pages secure. Even if this script
- * had a bug and showed someone a link they shouldn't have, Access would
- * still block them from actually opening that page - the real security
- * boundary lives in Access, not here.
+ * the homepage menu; it is not what makes pages secure.
  *
  * IMPORTANT - keep two places in sync when you add a new person:
- *   1. The Cloudflare Access policy for their team (this is what actually
- *      grants or denies access - it's the real lock).
- *   2. The ACCESS_MAP below (this only decides what shows up on their
- *      homepage menu - it's just for a tidy display).
- * If you forget step 2, that person can still open their team's link
- * directly (e.g. if you send it to them) - they just won't see it listed
- * on the homepage. If you forget step 1, they won't get in at all,
- * regardless of what this file says.
+ *   1. The Cloudflare Access policy for their team (the real lock).
+ *   2. The ACCESS_MAP below (just for what shows on their homepage menu).
  */
 
-// Every team page currently generated, and its actual filename in docs/.
-// These filenames change if generate_webpage.py's TEAMS list or the salt
-// changes - keep this in step with what's actually in your docs/ folder.
 const TEAM_PAGES = {
   Kids: "schedule-kids-5a092c1e.html",
   Digital: "schedule-digital-fe835502.html",
@@ -36,11 +24,6 @@ const TEAM_PAGES = {
 };
 const MASTER_FILE = "schedule-master-6bc54781.html";
 
-// Who sees what on the homepage menu.
-//   "ALL"                 -> sees Master + every team
-//   ["Kids", "Digital"]   -> sees just those specific teams (no Master)
-// Add a lowercase email entry for every person here. Anyone not listed
-// (or not logged in) sees a plain "no schedules assigned" message.
 const ACCESS_MAP = {
   "iestyn@carlamltd.com": "ALL",
   "bethan@carlamltd.com": "ALL",
@@ -73,7 +56,122 @@ function decodeAccessEmail(request) {
   }
 }
 
-function renderIndex(email) {
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const PAGE_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+
+  :root {
+    --bg: #0b0b0c;
+    --surface: #17171a;
+    --surface-hover: #1f1f23;
+    --border: #2a2a2e;
+    --text: #f5f5f3;
+    --text-dim: #8b8b90;
+    --accent: #3f7fd1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px 64px;
+  }
+  .page { width: 100%; max-width: 440px; }
+  .logo-wrap { text-align: center; margin-bottom: 28px; }
+  .logo-wrap img { width: 120px; height: auto; display: inline-block; }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px 0;
+    text-align: center;
+  }
+  .status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 32px;
+    letter-spacing: 0.02em;
+  }
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 rgba(63, 127, 209, 0.6);
+    animation: pulse 2.2s infinite;
+    flex-shrink: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dot { animation: none; }
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(63, 127, 209, 0.55); }
+    70%  { box-shadow: 0 0 0 7px rgba(63, 127, 209, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(63, 127, 209, 0); }
+  }
+  ul.links { list-style: none; margin: 0; padding: 0; }
+  ul.links li { margin-bottom: 10px; }
+  ul.links a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--text);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  ul.links a:hover, ul.links a:focus-visible {
+    background: var(--surface-hover);
+    border-color: #3a3a3f;
+  }
+  ul.links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tri {
+    flex-shrink: 0;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 9px solid var(--accent);
+  }
+  .link-text { display: flex; flex-direction: column; gap: 2px; }
+  .link-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
+    font-size: 15px;
+  }
+  .link-desc { font-size: 12px; color: var(--text-dim); }
+  .empty {
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-dim);
+    font-size: 14px;
+    text-align: center;
+  }
+`;
+
+function renderIndex(email, syncedAt) {
   const entry = email ? ACCESS_MAP[email] : undefined;
   const links = [];
 
@@ -93,11 +191,20 @@ function renderIndex(email) {
   const itemsHtml = links.length
     ? links
         .map(
-          ([label, file, desc]) =>
-            `<li><a href="${file}">${escapeHtml(label)}</a><div class="desc">${escapeHtml(desc)}</div></li>`
+          ([label, file, desc]) => `<li><a href="${file}">
+            <span class="tri"></span>
+            <span class="link-text">
+              <span class="link-label">${escapeHtml(label)}</span>
+              <span class="link-desc">${escapeHtml(desc)}</span>
+            </span>
+          </a></li>`
         )
         .join("")
-    : `<li><div class="empty">No schedules are assigned to your account yet. If this looks wrong, check with Iestyn.</div></li>`;
+    : `<li><div class="empty">No schedules are assigned to your account yet.<br>If this looks wrong, check with Iestyn.</div></li>`;
+
+  const statusHtml = syncedAt
+    ? `<div class="status"><span class="dot"></span>synced <span>${escapeHtml(syncedAt)}</span></div>`
+    : `<div class="status"><span class="dot"></span>live</div>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -105,54 +212,17 @@ function renderIndex(email) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Carlam Schedules</title>
-<style>
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    margin: 0;
-    padding: 24px 16px;
-    background: #fafafa;
-    color: #1a1a1a;
-    max-width: 480px;
-  }
-  h1 { font-size: 22px; margin: 0 0 20px 0; }
-  ul { list-style: none; margin: 0; padding: 0; }
-  li { margin-bottom: 12px; }
-  li a {
-    display: block;
-    padding: 14px 16px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    text-decoration: none;
-    color: #1a1a1a;
-    font-weight: 600;
-    font-size: 15px;
-  }
-  li a:hover { border-color: #999; }
-  .desc { font-size: 12px; color: #777; padding: 4px 16px 0 16px; }
-  .empty {
-    padding: 14px 16px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    color: #555;
-    font-size: 14px;
-  }
-</style>
+<style>${PAGE_STYLE}</style>
 </head>
 <body>
-  <h1>Carlam Schedules</h1>
-  <ul>${itemsHtml}</ul>
+  <div class="page">
+    <div class="logo-wrap"><img src="/carlam-logo.png" alt="Carlam"></div>
+    <h1>Schedules</h1>
+    ${statusHtml}
+    <ul class="links">${itemsHtml}</ul>
+  </div>
 </body>
 </html>`;
-}
-
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 export default {
@@ -161,14 +231,23 @@ export default {
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
       const email = decodeAccessEmail(request);
-      return new Response(renderIndex(email), {
+
+      let syncedAt = null;
+      try {
+        const syncResp = await env.ASSETS.fetch(new URL("/last-sync.json", request.url));
+        if (syncResp.ok) {
+          const data = await syncResp.json();
+          syncedAt = data.synced_at || null;
+        }
+      } catch (err) {
+        // If this fails for any reason, the page still renders fine without it.
+      }
+
+      return new Response(renderIndex(email, syncedAt), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
 
-    // Everything else (team pages, calendars, spreadsheet) is served as a
-    // normal static file, completely unchanged - and still separately
-    // protected by its own Cloudflare Access policy.
     return env.ASSETS.fetch(request);
   },
 };
