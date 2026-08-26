@@ -35,6 +35,12 @@ jobs:
           FILENAME_SALT: ${{ secrets.FILENAME_SALT }}
         run: python generate_ics.py
 
+      - name: Generate schedule grid
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: python generate_grid.py
+
       - name: Commit updated feeds
         run: |
           git config user.name "carlam-schedule-bot"
