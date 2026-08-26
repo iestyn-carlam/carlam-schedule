@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+<title>Carlam Team Schedule - Admin</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #fafafa;
+    color: #1a1a1a;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px 0;
+  }
+  .meta {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 16px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
+  table {
+    border-collapse: collapse;
+    min-width: 100%;
+  }
+  th, td {
+    border: 1px solid #e0e0e0;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  td {
+    white-space: normal;
+    min-width: 140px;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #333;
+    color: #fff;
+    z-index: 2;
+  }
+  .daterow {
+    position: sticky;
+    left: 0;
+    background: #f0f0f0;
+    z-index: 1;
+    font-weight: 600;
+  }
+  thead th.daterow {
+    background: #333;
+    color: #fff;
+    z-index: 3;
+  }
+  tr.weekend .daterow {
+    background: #d6d6d6;
+    border-left: 4px solid #999;
+  }
+  tr.weekend td {
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+  }
+  tr.today .daterow {
+    background: #ffe08a;
+  }
+  .entry {
+    margin-bottom: 4px;
+  }
+  .entry:last-child {
+    margin-bottom: 0;
+  }
+  .notes {
+    font-size: 11px;
+    color: #555;
+    font-style: italic;
+  }
+  a.back {
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #333;
+    text-decoration: none;
+  }
+  a.back:hover {
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Carlam Team Schedule - Admin</h1>
+  <div class="meta">Last updated 26 Aug 2026, 10:42 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th class="daterow">Date</th><th>Iestyn O&#x27;Leary</th></tr>
+      </thead>
+      <tbody>
+        <tr class="today"><th class='daterow'>Wed 26 Aug 2026</th><td style="background:#ffffff"><div class="entry">Full team meeting<div class="notes">Make notes everyone</div></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
