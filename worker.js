@@ -43,8 +43,19 @@ const MASTER_FILE = "schedule-master-6bc54781.html";
 // (or not logged in) sees a plain "no schedules assigned" message.
 const ACCESS_MAP = {
   "iestyn@carlamltd.com": "ALL",
+  "bethan@carlamltd.com": "ALL",
+  "ceri@carlamltd.com": ["Digital", "Admin"],
+  "cerys@carlamltd.com": ["Kids", "Admin"],
+  "derwena@carlamltd.com": "ALL",
+  "elin@carlamltd.com": "ALL",
+  "eurosllyr@carlamltd.com": "ALL",
+  "hannah@carlamltd.com": ["Factual", "Admin"],
+  "jason@carlamltd.com": ["Kids", "Technical", "Admin", "Factual"],
+  "lara@carlamltd.com": "ALL",
+  "osh@carlamltd.com": ["Digital", "Corporate", "Admin"],
+  "owain@carlamltd.com": ["Digital", "Admin"],
+  "rhodri@carlamltd.com": ["Digital", "Admin"],
   "wil@carlamltd.com": ["Digital", "Corporate", "Admin"],
-  // "someone.else@carlamltd.com": ["Digital", "Technical"],
 };
 
 function decodeAccessEmail(request) {
