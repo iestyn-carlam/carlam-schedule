@@ -71,7 +71,40 @@
     border-bottom: 1px solid #ccc;
   }
   tr.today .daterow {
-    background: #ffe08a;
+    background: #3f7fd1;
+    color: #fff;
+    border-left: 4px solid #26518f;
+  }
+  tr.today td {
+    background: rgba(63, 127, 209, 0.10);
+    border-top: 1px solid #3f7fd1;
+    border-bottom: 1px solid #3f7fd1;
+  }
+  .past-toggle-row td {
+    padding: 0;
+    border: none;
+  }
+  .past-toggle-wrap {
+    padding: 6px 0 12px 0;
+  }
+  .past-toggle {
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: #333;
+  }
+  .past-toggle:hover {
+    background: #f0f0f0;
+  }
+  tbody.past-weeks {
+    display: none;
+  }
+  tbody.past-weeks.expanded {
+    display: table-row-group;
   }
   .entry {
     margin-bottom: 4px;
@@ -99,7 +132,7 @@
 <body>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Carlam Team Schedule - Corporate</h1>
-  <div class="meta">Last updated 26 Aug 2026, 13:22 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="meta">Last updated 26 Aug 2026, 13:31 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
   <p style="color:#666;font-size:14px;">No entries tagged for this team yet.</p>
 </body>
 </html>

@@ -71,7 +71,40 @@
     border-bottom: 1px solid #ccc;
   }
   tr.today .daterow {
-    background: #ffe08a;
+    background: #3f7fd1;
+    color: #fff;
+    border-left: 4px solid #26518f;
+  }
+  tr.today td {
+    background: rgba(63, 127, 209, 0.10);
+    border-top: 1px solid #3f7fd1;
+    border-bottom: 1px solid #3f7fd1;
+  }
+  .past-toggle-row td {
+    padding: 0;
+    border: none;
+  }
+  .past-toggle-wrap {
+    padding: 6px 0 12px 0;
+  }
+  .past-toggle {
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: #333;
+  }
+  .past-toggle:hover {
+    background: #f0f0f0;
+  }
+  tbody.past-weeks {
+    display: none;
+  }
+  tbody.past-weeks.expanded {
+    display: table-row-group;
   }
   .entry {
     margin-bottom: 4px;
@@ -99,14 +132,28 @@
 <body>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Carlam Team Schedule - Factual</h1>
-  <div class="meta">Last updated 26 Aug 2026, 13:22 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="meta">Last updated 26 Aug 2026, 13:31 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr><th class="daterow">Date</th><th>Iestyn O&#x27;Leary</th></tr>
       </thead>
+      <tbody id="past-weeks" class="past-weeks">
+        <tr><th class='daterow'>Fri 14 Aug 2026</th><td style="background:#c9daf8"><div class="entry">Delivery - Rookie Teachers</div></td></tr><tr class="weekend"><th class='daterow'>Sat 15 Aug</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 16 Aug</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 17 Aug</th><td></td></tr><tr><th class='daterow'>Tue 18 Aug</th><td></td></tr><tr><th class='daterow'>Wed 19 Aug</th><td></td></tr><tr><th class='daterow'>Thu 20 Aug</th><td></td></tr><tr><th class='daterow'>Fri 21 Aug</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 22 Aug</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 23 Aug</th><td style="background:#eaeaea"></td></tr>
+      </tbody>
       <tbody>
-        <tr><th class='daterow'>Fri 14 Aug 2026</th><td style="background:#c9daf8"><div class="entry">Delivery - Rookie Teachers</div></td></tr><tr class="weekend"><th class='daterow'>Sat 15 Aug</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 16 Aug</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 17 Aug</th><td></td></tr><tr><th class='daterow'>Tue 18 Aug</th><td></td></tr><tr><th class='daterow'>Wed 19 Aug</th><td></td></tr><tr><th class='daterow'>Thu 20 Aug</th><td></td></tr><tr><th class='daterow'>Fri 21 Aug</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 22 Aug</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 23 Aug</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 24 Aug</th><td></td></tr><tr><th class='daterow'>Tue 25 Aug</th><td></td></tr><tr class="today"><th class='daterow'>Wed 26 Aug</th><td></td></tr><tr><th class='daterow'>Thu 27 Aug</th><td></td></tr><tr><th class='daterow'>Fri 28 Aug</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 29 Aug</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 30 Aug</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 31 Aug</th><td></td></tr><tr><th class='daterow'>Tue 01 Sep</th><td></td></tr><tr><th class='daterow'>Wed 02 Sep</th><td></td></tr><tr><th class='daterow'>Thu 03 Sep</th><td></td></tr><tr><th class='daterow'>Fri 04 Sep</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 05 Sep</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 06 Sep</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 07 Sep</th><td></td></tr><tr><th class='daterow'>Tue 08 Sep</th><td></td></tr><tr><th class='daterow'>Wed 09 Sep</th><td></td></tr><tr><th class='daterow'>Thu 10 Sep</th><td></td></tr><tr><th class='daterow'>Fri 11 Sep</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 12 Sep</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 13 Sep</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 14 Sep</th><td></td></tr><tr><th class='daterow'>Tue 15 Sep</th><td></td></tr><tr><th class='daterow'>Wed 16 Sep</th><td style="background:#c9daf8"><div class="entry">Delivery - Rookie Teachers</div></td></tr><tr><th class='daterow'>Thu 17 Sep</th><td></td></tr><tr><th class='daterow'>Fri 18 Sep</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 19 Sep</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 20 Sep</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 21 Sep</th><td></td></tr><tr><th class='daterow'>Tue 22 Sep</th><td></td></tr><tr><th class='daterow'>Wed 23 Sep</th><td></td></tr><tr><th class='daterow'>Thu 24 Sep</th><td></td></tr><tr><th class='daterow'>Fri 25 Sep</th><td style="background:#c9daf8"><div class="entry">Delivery - Rookie Teachers</div></td></tr>
+        <tr class="past-toggle-row"><td colspan="2">
+          <div class="past-toggle-wrap">
+            <button type="button" class="past-toggle" onclick="
+              var pw = document.getElementById('past-weeks');
+              var expanded = pw.classList.toggle('expanded');
+              this.textContent = expanded ? '↑ Hide earlier weeks' : '↓ Show earlier weeks (10 days)';
+            ">&darr; Show earlier weeks (10 days)</button>
+          </div>
+        </td></tr>
+      </tbody>
+      <tbody>
+        <tr><th class='daterow'>Mon 24 Aug</th><td></td></tr><tr><th class='daterow'>Tue 25 Aug</th><td></td></tr><tr class="today"><th class='daterow'>Wed 26 Aug</th><td></td></tr><tr><th class='daterow'>Thu 27 Aug</th><td></td></tr><tr><th class='daterow'>Fri 28 Aug</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 29 Aug</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 30 Aug</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 31 Aug</th><td></td></tr><tr><th class='daterow'>Tue 01 Sep</th><td></td></tr><tr><th class='daterow'>Wed 02 Sep</th><td></td></tr><tr><th class='daterow'>Thu 03 Sep</th><td></td></tr><tr><th class='daterow'>Fri 04 Sep</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 05 Sep</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 06 Sep</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 07 Sep</th><td></td></tr><tr><th class='daterow'>Tue 08 Sep</th><td></td></tr><tr><th class='daterow'>Wed 09 Sep</th><td></td></tr><tr><th class='daterow'>Thu 10 Sep</th><td></td></tr><tr><th class='daterow'>Fri 11 Sep</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 12 Sep</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 13 Sep</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 14 Sep</th><td></td></tr><tr><th class='daterow'>Tue 15 Sep</th><td></td></tr><tr><th class='daterow'>Wed 16 Sep</th><td style="background:#c9daf8"><div class="entry">Delivery - Rookie Teachers</div></td></tr><tr><th class='daterow'>Thu 17 Sep</th><td></td></tr><tr><th class='daterow'>Fri 18 Sep</th><td></td></tr><tr class="weekend"><th class='daterow'>Sat 19 Sep</th><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 20 Sep</th><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 21 Sep</th><td></td></tr><tr><th class='daterow'>Tue 22 Sep</th><td></td></tr><tr><th class='daterow'>Wed 23 Sep</th><td></td></tr><tr><th class='daterow'>Thu 24 Sep</th><td></td></tr><tr><th class='daterow'>Fri 25 Sep</th><td style="background:#c9daf8"><div class="entry">Delivery - Rookie Teachers</div></td></tr>
       </tbody>
     </table>
   </div>
