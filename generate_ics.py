@@ -94,7 +94,11 @@ def extract_row(page):
     people = [p.get("name", "Unknown") for p in props.get("Person", {}).get("people", [])]
 
     # Fallback: temporary plain-text name for anyone not yet added to Notion
-    person_name_text = get_plain_text(props.get("Person Name", {}).get("rich_text", []))
+    person_name_prop = props.get("Person Name", {})
+    if "select" in person_name_prop:
+        person_name_text = (person_name_prop.get("select") or {}).get("name", "")
+    else:
+        person_name_text = get_plain_text(person_name_prop.get("rich_text", []))
     if not people and person_name_text:
         people = [person_name_text]
 
@@ -137,6 +141,13 @@ def build_vevent(row) -> str:
     if not row["start_date"]:
         return ""
 
+    start = row["start_date"].replace("-", "")[:8]
+    if row["end_date"]:
+        end_date_obj = date.fromisoformat(row["end_date"][:10])
+    else:
+        end_date_obj = date.fromisoformat(row["start_date"][:10])
+    end = end_date_obj.strftime("%Y%m%d")
+
     summary_parts = [p for p in [row["status"], row["title"]] if p]
     summary = escape_ics_text(" - ".join(summary_parts) or "Untitled")
 
@@ -152,44 +163,14 @@ def build_vevent(row) -> str:
     uid = f"{row['page_id']}@carlam-schedule"
     dtstamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
 
-    lines = ["BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{dtstamp}"]
-
-    if row["is_datetime"]:
-        # A specific time was set in Notion - write a timed event.
-        # Notion gives us an ISO string with a UTC offset, e.g.
-        # "2026-08-26T10:00:00.000+01:00". We convert to UTC so the
-        # event displays correctly regardless of the reader's timezone.
-        start_dt = datetime.fromisoformat(row["start_date"])
-        if start_dt.tzinfo is not None:
-            start_dt = start_dt.astimezone(tz=None).utctimetuple()
-            start_dt = datetime(*start_dt[:6])
-        start_str = start_dt.strftime("%Y%m%dT%H%M%SZ")
-
-        if row["end_date"]:
-            end_dt = datetime.fromisoformat(row["end_date"])
-        else:
-            end_dt = datetime.fromisoformat(row["start_date"]) 
-            end_dt = end_dt.replace(hour=min(end_dt.hour + 1, 23))
-        if end_dt.tzinfo is not None:
-            end_dt = end_dt.astimezone(tz=None).utctimetuple()
-            end_dt = datetime(*end_dt[:6])
-        end_str = end_dt.strftime("%Y%m%dT%H%M%SZ")
-
-        lines.append(f"DTSTART:{start_str}")
-        lines.append(f"DTEND:{end_str}")
-    else:
-        # No time was set in Notion - keep it as an all-day event.
-        start = row["start_date"].replace("-", "")[:8]
-        if row["end_date"]:
-            end_date_obj = date.fromisoformat(row["end_date"][:10])
-        else:
-            end_date_obj = date.fromisoformat(row["start_date"][:10])
-        end = end_date_obj.strftime("%Y%m%d")
-
-        lines.append(f"DTSTART;VALUE=DATE:{start}")
-        lines.append(f"DTEND;VALUE=DATE:{end}")
-
-    lines.append(f"SUMMARY:{summary}")
+    lines = [
+        "BEGIN:VEVENT",
+        f"UID:{uid}",
+        f"DTSTAMP:{dtstamp}",
+        f"DTSTART;VALUE=DATE:{start}",
+        f"DTEND;VALUE=DATE:{end}",
+        f"SUMMARY:{summary}",
+    ]
     if description:
         lines.append(f"DESCRIPTION:{description}")
     if row["programme"]:
