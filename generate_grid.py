@@ -103,7 +103,11 @@ def extract_row(page):
     notes = get_plain_text(props.get("Notes", {}).get("rich_text", []))
 
     people = [p.get("name", "Unknown") for p in props.get("Person", {}).get("people", [])]
-    person_name_text = get_plain_text(props.get("Person Name", {}).get("rich_text", []))
+    person_name_prop = props.get("Person Name", {})
+    if "select" in person_name_prop:
+        person_name_text = (person_name_prop.get("select") or {}).get("name", "")
+    else:
+        person_name_text = get_plain_text(person_name_prop.get("rich_text", []))
     if not people and person_name_text:
         people = [person_name_text]
 
