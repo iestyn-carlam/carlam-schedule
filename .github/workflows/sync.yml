@@ -5,7 +5,7 @@ on:
     # Runs every 5 minutes. GitHub Actions free tier gives 2,000 minutes/month
     # on private repos and unlimited minutes on public repos - this uses only
     # a fraction of a minute per run, so it stays free indefinitely.
-    - cron: "*/5 * * * *"
+    - cron: "*/6 * * * *"
   workflow_dispatch: {}   # lets you trigger a manual run/test from the Actions tab
   push:
     branches: [ main ]
