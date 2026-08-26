@@ -23,6 +23,7 @@ import sys
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -416,6 +417,16 @@ def main():
     index_html = build_index_html(index_links)
     (OUTPUT_DIR / "index.html").write_text(index_html, encoding="utf-8")
     print("Wrote index.html")
+
+    # A small timestamp file so the Worker's personalized homepage can show
+    # a real "last synced" readout, not just the visitor's own clock.
+    # Uses Europe/London so it automatically shows the correct time whether
+    # it's GMT or British Summer Time, rather than a fixed UTC offset.
+    import json as _json
+    uk_now = datetime.now(ZoneInfo("Europe/London"))
+    sync_info = {"synced_at": uk_now.strftime("%H:%M:%S")}
+    (OUTPUT_DIR / "last-sync.json").write_text(_json.dumps(sync_info), encoding="utf-8")
+    print("Wrote last-sync.json")
 
 
 if __name__ == "__main__":
