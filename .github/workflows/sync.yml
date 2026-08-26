@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: carlam-schedule-sync
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -55,4 +59,5 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add docs/
           git diff --quiet --cached || git commit -m "Update calendar feeds"
+          git pull --rebase --autostash origin main
           git push
