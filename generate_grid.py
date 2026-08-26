@@ -12,6 +12,7 @@ shared grid file, from the same Notion data.
 No paid service is involved anywhere in this pipeline.
 """
 
+import hashlib
 import os
 import sys
 from collections import defaultdict
@@ -23,11 +24,26 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+# Reuses the same private salt as generate_ics.py, so this file's name is
+# just as unguessable as the individual calendar links. Without it set, the
+# script refuses to run rather than silently using a public/predictable name.
+FILENAME_SALT = os.environ.get("FILENAME_SALT")
+if not FILENAME_SALT:
+    print(
+        "FILENAME_SALT is not set. Refusing to run: without a private salt, "
+        "the grid filename would be guessable. Add a FILENAME_SALT repository "
+        "secret in GitHub (Settings -> Secrets and variables -> Actions) and "
+        "re-run.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 DATABASE_ID = os.environ["NOTION_DATABASE_ID"]
 NOTION_VERSION = "2022-06-28"
 OUTPUT_DIR = Path(__file__).parent / "docs"
-OUTPUT_FILE = OUTPUT_DIR / "schedule-grid.xlsx"
+GRID_SUFFIX = hashlib.sha256(f"{FILENAME_SALT}:schedule-grid".encode()).hexdigest()[:8]
+OUTPUT_FILE = OUTPUT_DIR / f"schedule-grid-{GRID_SUFFIX}.xlsx"
 
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
