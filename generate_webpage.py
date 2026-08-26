@@ -204,7 +204,40 @@ PAGE_STYLE = """
     border-bottom: 1px solid #ccc;
   }
   tr.today .daterow {
-    background: #ffe08a;
+    background: #3f7fd1;
+    color: #fff;
+    border-left: 4px solid #26518f;
+  }
+  tr.today td {
+    background: rgba(63, 127, 209, 0.10);
+    border-top: 1px solid #3f7fd1;
+    border-bottom: 1px solid #3f7fd1;
+  }
+  .past-toggle-row td {
+    padding: 0;
+    border: none;
+  }
+  .past-toggle-wrap {
+    padding: 6px 0 12px 0;
+  }
+  .past-toggle {
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: #333;
+  }
+  .past-toggle:hover {
+    background: #f0f0f0;
+  }
+  tbody.past-weeks {
+    display: none;
+  }
+  tbody.past-weeks.expanded {
+    display: table-row-group;
   }
   .entry {
     margin-bottom: 4px;
@@ -249,9 +282,15 @@ def build_html(rows, page_title, back_link=None) -> str:
 
     header_cells = "".join(f"<th>{html.escape(p)}</th>" for p in people)
 
-    body_rows = []
-    current = min_date
+    # Everything before the Monday of the current week gets tucked away
+    # behind a toggle, so people land on "this week onward" by default
+    # instead of scrolling past months of old entries.
     today = date.today()
+    start_of_week = today - timedelta(days=today.weekday())
+
+    past_rows = []
+    current_rows = []
+    current = min_date
     last_shown_year = None
     while current <= max_date:
         is_weekend = current.weekday() >= 5
@@ -279,7 +318,12 @@ def build_html(rows, page_title, back_link=None) -> str:
                 colour = "transparent"
             style = f' style="background:{colour}"' if colour != "transparent" else ""
             cells.append(f"<td{style}>{cell_html(entries)}</td>")
-        body_rows.append(f"<tr{row_class_attr}>{''.join(cells)}</tr>")
+        row_html = f"<tr{row_class_attr}>{''.join(cells)}</tr>"
+
+        if current < start_of_week:
+            past_rows.append(row_html)
+        else:
+            current_rows.append(row_html)
 
         current += timedelta(days=1)
 
@@ -289,13 +333,34 @@ def build_html(rows, page_title, back_link=None) -> str:
     if not people:
         table_html = '<p style="color:#666;font-size:14px;">No entries tagged for this team yet.</p>'
     else:
+        col_count = len(people) + 1
+        toggle_row = ""
+        past_tbody = ""
+        if past_rows:
+            toggle_row = f"""<tbody>
+        <tr class="past-toggle-row"><td colspan="{col_count}">
+          <div class="past-toggle-wrap">
+            <button type="button" class="past-toggle" onclick="
+              var pw = document.getElementById('past-weeks');
+              var expanded = pw.classList.toggle('expanded');
+              this.textContent = expanded ? '\u2191 Hide earlier weeks' : '\u2193 Show earlier weeks ({len(past_rows)} days)';
+            ">&darr; Show earlier weeks ({len(past_rows)} days)</button>
+          </div>
+        </td></tr>
+      </tbody>"""
+            past_tbody = f"""<tbody id="past-weeks" class="past-weeks">
+        {''.join(past_rows)}
+      </tbody>"""
+
         table_html = f"""<div class="table-wrap">
     <table>
       <thead>
         <tr><th class="daterow">Date</th>{header_cells}</tr>
       </thead>
+      {past_tbody}
+      {toggle_row}
       <tbody>
-        {''.join(body_rows)}
+        {''.join(current_rows)}
       </tbody>
     </table>
   </div>"""
