@@ -15,7 +15,7 @@
  */
 
 const TEAM_PAGES = {
-  Kids: "schedule-kids-5a092c1e.html",
+  Children: "schedule-children-64585b7f.html",
   Digital: "schedule-digital-fe835502.html",
   Corporate: "schedule-corporate-d2a0bfc5.html",
   Technical: "schedule-technical-62ca0dbf.html",
@@ -28,12 +28,12 @@ const ACCESS_MAP = {
   "iestyn@carlamltd.com": "ALL",
   "bethan@carlamltd.com": "ALL",
   "ceri@carlamltd.com": ["Digital", "Admin"],
-  "cerys@carlamltd.com": ["Kids", "Admin"],
+  "cerys@carlamltd.com": ["Children", "Admin"],
   "derwena@carlamltd.com": "ALL",
   "elin@carlamltd.com": "ALL",
   "eurosllyr@carlamltd.com": "ALL",
   "hannah@carlamltd.com": ["Factual", "Admin"],
-  "jason@carlamltd.com": ["Kids", "Technical", "Admin", "Factual"],
+  "jason@carlamltd.com": ["Children", "Technical", "Admin", "Factual"],
   "lara@carlamltd.com": "ALL",
   "osh@carlamltd.com": ["Digital", "Corporate", "Admin"],
   "owain@carlamltd.com": ["Digital", "Admin"],
