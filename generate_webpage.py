@@ -147,6 +147,7 @@ def build_html(rows) -> str:
     body_rows = []
     current = min_date
     today = date.today()
+    last_shown_year = None
     while current <= max_date:
         is_weekend = current.weekday() >= 5
         is_today = current == today
@@ -157,12 +158,24 @@ def build_html(rows) -> str:
             row_classes.append("today")
         row_class_attr = f' class="{" ".join(row_classes)}"' if row_classes else ""
 
-        date_label = html.escape(current.strftime("%a %d %b %Y"))
+        # Only show the year when it's the first row, or when it changes from
+        # the row before - like a normal calendar, the year is implied
+        # otherwise and just adds clutter to every single row.
+        if current.year != last_shown_year:
+            date_label = html.escape(current.strftime("%a %d %b %Y"))
+            last_shown_year = current.year
+        else:
+            date_label = html.escape(current.strftime("%a %d %b"))
         cells = [f"<th class='daterow'>{date_label}</th>"]
         for person in people:
             entries = grid.get((current, person), [])
-            colour = STATUS_COLOURS.get(entries[0]["status"], DEFAULT_COLOUR) if entries else "transparent"
-            style = f' style="background:{colour}"' if entries else ""
+            if entries:
+                colour = STATUS_COLOURS.get(entries[0]["status"], DEFAULT_COLOUR)
+            elif is_weekend:
+                colour = "#eaeaea"
+            else:
+                colour = "transparent"
+            style = f' style="background:{colour}"' if colour != "transparent" else ""
             cells.append(f"<td{style}>{cell_html(entries)}</td>")
         body_rows.append(f"<tr{row_class_attr}>{''.join(cells)}</tr>")
 
@@ -230,7 +243,12 @@ def build_html(rows) -> str:
     font-weight: 600;
   }}
   tr.weekend .daterow {{
-    background: #e6e6e6;
+    background: #d6d6d6;
+    border-left: 4px solid #999;
+  }}
+  tr.weekend td {{
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
   }}
   tr.today .daterow {{
     background: #ffe08a;
