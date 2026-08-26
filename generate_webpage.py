@@ -242,6 +242,11 @@ def build_html(rows) -> str:
     z-index: 1;
     font-weight: 600;
   }}
+  thead th.daterow {{
+    background: #333;
+    color: #fff;
+    z-index: 3;
+  }}
   tr.weekend .daterow {{
     background: #d6d6d6;
     border-left: 4px solid #999;
