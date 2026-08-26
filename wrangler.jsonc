@@ -1,9 +1,0 @@
-{
-  "name": "carlam-schedule",
-  "compatibility_date": "2026-01-01",
-  "main": "worker.js",
-  "assets": {
-    "directory": "./docs",
-    "binding": "ASSETS"
-  }
-}
