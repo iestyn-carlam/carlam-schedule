@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-Pulls every row from the Carlam Team Schedule Notion database and writes a
-single self-contained HTML page (docs/schedule-<salt>.html) showing the same
-grid layout as the Excel version - people across, dates down - but viewable
-directly in a browser with no download step.
+Pulls every row from the Carlam Team Schedule Notion database and writes
+several self-contained HTML pages into docs/:
 
-The page auto-refreshes itself every couple of minutes, so as long as
-someone keeps the tab open (or reopens the link), they're looking at data
-that's at most a few minutes old, in step with the sync schedule.
+  - index.html               a landing page with links to every schedule
+  - schedule-master-<salt>.html   everyone, all teams, in one grid
+  - schedule-<team>-<salt>.html   one page per Team option, filtered
+
+All pages use the same grid layout as before - people across, dates down -
+and auto-refresh every couple of minutes. Access to individual pages is
+controlled separately via Cloudflare Access policies (one policy per team
+page), so who sees what is decided in Cloudflare, not by this script.
 
 Runs alongside generate_ics.py and generate_grid.py in the same GitHub
-Actions workflow - same Notion data feeds all three outputs.
+Actions workflow - same Notion data feeds all outputs.
 """
 
 import hashlib
@@ -23,13 +26,11 @@ from pathlib import Path
 
 import requests
 
-# Reuses the same private salt as the other scripts, so this page's filename
-# is just as unguessable as the calendar and spreadsheet links.
 FILENAME_SALT = os.environ.get("FILENAME_SALT")
 if not FILENAME_SALT:
     print(
         "FILENAME_SALT is not set. Refusing to run: without a private salt, "
-        "the page filename would be guessable. Add a FILENAME_SALT repository "
+        "page filenames would be guessable. Add a FILENAME_SALT repository "
         "secret in GitHub (Settings -> Secrets and variables -> Actions) and "
         "re-run.",
         file=sys.stderr,
@@ -40,11 +41,11 @@ NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 DATABASE_ID = os.environ["NOTION_DATABASE_ID"]
 NOTION_VERSION = "2022-06-28"
 OUTPUT_DIR = Path(__file__).parent / "docs"
-PAGE_SUFFIX = hashlib.sha256(f"{FILENAME_SALT}:schedule-page".encode()).hexdigest()[:8]
-OUTPUT_FILE = OUTPUT_DIR / f"schedule-{PAGE_SUFFIX}.html"
 
-# How often the page reloads itself in the browser, in seconds. Keep this in
-# step with the GitHub Actions sync interval (currently every 5 minutes).
+# The full list of teams. Must match the options on the "Team" select field
+# in Notion exactly (case-sensitive).
+TEAMS = ["Corporate", "Kids", "Digital", "Technical", "Admin", "Factual"]
+
 AUTO_REFRESH_SECONDS = 120
 
 HEADERS = {
@@ -67,6 +68,15 @@ STATUS_COLOURS = {
     "Tentative": "#ead1dc",
 }
 DEFAULT_COLOUR = "#ffffff"
+
+
+def page_suffix(name: str) -> str:
+    """Same salted-hash approach as the other scripts, one per page name."""
+    return hashlib.sha256(f"{FILENAME_SALT}:{name}".encode()).hexdigest()[:8]
+
+
+def slugify(name: str) -> str:
+    return name.lower().replace(" ", "-")
 
 
 def fetch_all_rows():
@@ -96,6 +106,7 @@ def extract_row(page):
     programme = (props.get("Programme", {}).get("select") or {}).get("name", "")
     status = (props.get("Status", {}).get("status") or props.get("Status", {}).get("select") or {}).get("name", "")
     notes = get_plain_text(props.get("Notes", {}).get("rich_text", []))
+    team = (props.get("Team", {}).get("select") or {}).get("name", "")
     people = [p.get("name", "Unknown") for p in props.get("Person", {}).get("people", [])]
     person_name_text = get_plain_text(props.get("Person Name", {}).get("rich_text", []))
     if not people and person_name_text:
@@ -106,6 +117,7 @@ def extract_row(page):
         "programme": programme,
         "status": status,
         "notes": notes,
+        "team": team,
         "people": people,
     }
 
@@ -125,7 +137,99 @@ def cell_html(entries) -> str:
     return "".join(blocks)
 
 
-def build_html(rows) -> str:
+PAGE_STYLE = """
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #fafafa;
+    color: #1a1a1a;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px 0;
+  }
+  .meta {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 16px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
+  table {
+    border-collapse: collapse;
+    min-width: 100%;
+  }
+  th, td {
+    border: 1px solid #e0e0e0;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  td {
+    white-space: normal;
+    min-width: 140px;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #333;
+    color: #fff;
+    z-index: 2;
+  }
+  .daterow {
+    position: sticky;
+    left: 0;
+    background: #f0f0f0;
+    z-index: 1;
+    font-weight: 600;
+  }
+  thead th.daterow {
+    background: #333;
+    color: #fff;
+    z-index: 3;
+  }
+  tr.weekend .daterow {
+    background: #d6d6d6;
+    border-left: 4px solid #999;
+  }
+  tr.weekend td {
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+  }
+  tr.today .daterow {
+    background: #ffe08a;
+  }
+  .entry {
+    margin-bottom: 4px;
+  }
+  .entry:last-child {
+    margin-bottom: 0;
+  }
+  .notes {
+    font-size: 11px;
+    color: #555;
+    font-style: italic;
+  }
+  a.back {
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #333;
+    text-decoration: none;
+  }
+  a.back:hover {
+    text-decoration: underline;
+  }
+"""
+
+
+def build_html(rows, page_title, back_link=None) -> str:
     people = sorted({p for r in rows for p in r["people"]})
     dated_rows = [r for r in rows if r["start_date"]]
 
@@ -158,9 +262,6 @@ def build_html(rows) -> str:
             row_classes.append("today")
         row_class_attr = f' class="{" ".join(row_classes)}"' if row_classes else ""
 
-        # Only show the year when it's the first row, or when it changes from
-        # the row before - like a normal calendar, the year is implied
-        # otherwise and just adds clutter to every single row.
         if current.year != last_shown_year:
             date_label = html.escape(current.strftime("%a %d %b %Y"))
             last_shown_year = current.year
@@ -182,99 +283,12 @@ def build_html(rows) -> str:
         current += timedelta(days=1)
 
     generated_at = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
+    back_html = f'<a class="back" href="{back_link}">&larr; All schedules</a>' if back_link else ""
 
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="{AUTO_REFRESH_SECONDS}">
-<title>Carlam Team Schedule</title>
-<style>
-  body {{
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    margin: 0;
-    padding: 16px;
-    background: #fafafa;
-    color: #1a1a1a;
-  }}
-  h1 {{
-    font-size: 20px;
-    margin: 0 0 4px 0;
-  }}
-  .meta {{
-    font-size: 13px;
-    color: #666;
-    margin-bottom: 16px;
-  }}
-  .table-wrap {{
-    overflow-x: auto;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-  }}
-  table {{
-    border-collapse: collapse;
-    min-width: 100%;
-  }}
-  th, td {{
-    border: 1px solid #e0e0e0;
-    padding: 8px 10px;
-    text-align: left;
-    vertical-align: top;
-    font-size: 13px;
-    white-space: nowrap;
-  }}
-  td {{
-    white-space: normal;
-    min-width: 140px;
-  }}
-  thead th {{
-    position: sticky;
-    top: 0;
-    background: #333;
-    color: #fff;
-    z-index: 2;
-  }}
-  .daterow {{
-    position: sticky;
-    left: 0;
-    background: #f0f0f0;
-    z-index: 1;
-    font-weight: 600;
-  }}
-  thead th.daterow {{
-    background: #333;
-    color: #fff;
-    z-index: 3;
-  }}
-  tr.weekend .daterow {{
-    background: #d6d6d6;
-    border-left: 4px solid #999;
-  }}
-  tr.weekend td {{
-    border-top: 1px solid #ccc;
-    border-bottom: 1px solid #ccc;
-  }}
-  tr.today .daterow {{
-    background: #ffe08a;
-  }}
-  .entry {{
-    margin-bottom: 4px;
-  }}
-  .entry:last-child {{
-    margin-bottom: 0;
-  }}
-  .notes {{
-    font-size: 11px;
-    color: #555;
-    font-style: italic;
-  }}
-</style>
-</head>
-<body>
-  <h1>Carlam Team Schedule</h1>
-  <div class="meta">Last updated {generated_at} &middot; refreshes automatically every {AUTO_REFRESH_SECONDS // 60} minutes &middot; keep this tab open for a live view</div>
-  <div class="table-wrap">
+    if not people:
+        table_html = '<p style="color:#666;font-size:14px;">No entries tagged for this team yet.</p>'
+    else:
+        table_html = f"""<div class="table-wrap">
     <table>
       <thead>
         <tr><th class="daterow">Date</th>{header_cells}</tr>
@@ -283,7 +297,86 @@ def build_html(rows) -> str:
         {''.join(body_rows)}
       </tbody>
     </table>
-  </div>
+  </div>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="{AUTO_REFRESH_SECONDS}">
+<title>{html.escape(page_title)}</title>
+<style>{PAGE_STYLE}</style>
+</head>
+<body>
+  {back_html}
+  <h1>{html.escape(page_title)}</h1>
+  <div class="meta">Last updated {generated_at} &middot; refreshes automatically every {AUTO_REFRESH_SECONDS // 60} minutes &middot; keep this tab open for a live view</div>
+  {table_html}
+</body>
+</html>
+"""
+
+
+def build_index_html(links) -> str:
+    """links: list of (label, filename, description) tuples."""
+    items = "".join(
+        f'<li><a href="{fn}">{html.escape(label)}</a><div class="desc">{html.escape(desc)}</div></li>'
+        for label, fn, desc in links
+    )
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carlam Schedules</title>
+<style>
+  body {{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 24px 16px;
+    background: #fafafa;
+    color: #1a1a1a;
+    max-width: 480px;
+  }}
+  h1 {{
+    font-size: 22px;
+    margin: 0 0 20px 0;
+  }}
+  ul {{
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }}
+  li {{
+    margin-bottom: 12px;
+  }}
+  li a {{
+    display: block;
+    padding: 14px 16px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #1a1a1a;
+    font-weight: 600;
+    font-size: 15px;
+  }}
+  li a:hover {{
+    border-color: #999;
+  }}
+  .desc {{
+    font-size: 12px;
+    color: #777;
+    padding: 4px 16px 0 16px;
+  }}
+</style>
+</head>
+<body>
+  <h1>Carlam Schedules</h1>
+  <ul>
+    {items}
+  </ul>
 </body>
 </html>
 """
@@ -295,11 +388,34 @@ def main():
     rows = [extract_row(p) for p in pages]
     print(f"Fetched {len(rows)} rows.")
 
-    page_html = build_html(rows)
-
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT_FILE.write_text(page_html, encoding="utf-8")
-    print(f"Wrote {OUTPUT_FILE}")
+
+    index_links = []
+
+    # Master page - everyone, every team
+    master_suffix = page_suffix("schedule-master")
+    master_filename = f"schedule-master-{master_suffix}.html"
+    master_html = build_html(rows, "Carlam Team Schedule - All Teams", back_link="index.html")
+    (OUTPUT_DIR / master_filename).write_text(master_html, encoding="utf-8")
+    print(f"Wrote {master_filename} ({len(rows)} rows, all teams)")
+    index_links.append(("All Teams (Master)", master_filename, "Everyone, every team, in one grid"))
+
+    # One page per team
+    for team in TEAMS:
+        team_rows = [r for r in rows if r["team"] == team]
+        suffix = page_suffix(f"schedule-{team}")
+        filename = f"schedule-{slugify(team)}-{suffix}.html"
+        team_html = build_html(team_rows, f"Carlam Team Schedule - {team}", back_link="index.html")
+        (OUTPUT_DIR / filename).write_text(team_html, encoding="utf-8")
+        print(f"Wrote {filename} ({len(team_rows)} rows, {team})")
+        index_links.append((team, filename, f"{team} team schedule"))
+
+    # Landing page - deliberately at a fixed, unsalted name (index.html) since
+    # it's meant to be found. Actual privacy is enforced per-page by
+    # Cloudflare Access policies, not by hiding this list.
+    index_html = build_index_html(index_links)
+    (OUTPUT_DIR / "index.html").write_text(index_html, encoding="utf-8")
+    print("Wrote index.html")
 
 
 if __name__ == "__main__":
