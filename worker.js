@@ -249,22 +249,18 @@ function renderIndex(email, syncedAt) {
 </html>`;
 }
 
-const STATUS_COLOURS = {
-  "A/L": "#fff2cc",
-  "OFF": "#f4cccc",
-  "TOIL": "#f4cccc",
-  "Offline Edit": "#d9ead3",
-  "Online Edit": "#d9ead3",
-  "Finishing": "#cfe2f3",
-  "Delivery": "#c9daf8",
-  "Archive": "#efefef",
-  "Priority task": "#f9cb9c",
-  "Notes / Changes": "#fff2cc",
-  "Tentative": "#ead1dc",
-  "External": "#f9cb9c",
-  "Edit": "#d9ead3",
-  "Paperwork": "#e8d5c4",
-};
+// Same formula as generate_webpage.py's programme_colour(), so a given
+// programme always renders the same pastel colour on both the team grids
+// and this personal view - and automatically works for any programme
+// added in future, with no list to keep updated.
+function programmeColour(name) {
+  if (!name) return "";
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) % 360;
+  }
+  return `hsl(${h}, 60%, 85%)`;
+}
 
 function renderPersonalSchedule(personName, rows, syncedAt) {
   const today = new Date();
@@ -291,7 +287,7 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
         });
         const parts = [r.programme, r.status, r.title].filter(Boolean);
         const line = escapeHtml(parts.join(" - ") || "Untitled");
-        const colour = STATUS_COLOURS[r.status] || "#ffffff";
+        const colour = programmeColour(r.programme) || "#f2f2f2";
         const rowClass = isToday ? "today" : isPast ? "past" : "";
         return `<div class="entry ${rowClass}">
           <div class="entry-date">${escapeHtml(dateLabel)}</div>
