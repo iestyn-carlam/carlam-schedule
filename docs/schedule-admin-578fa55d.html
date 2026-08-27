@@ -24,6 +24,8 @@
   }
   .table-wrap {
     overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
     border: 1px solid #ddd;
     border-radius: 6px;
   }
@@ -38,10 +40,26 @@
     vertical-align: top;
     font-size: 13px;
     white-space: nowrap;
+    min-width: 140px;
   }
   td {
     white-space: normal;
-    min-width: 140px;
+  }
+  .scroll-hint {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #666;
+    background: #fffbe6;
+    border: 1px solid #f0e0a0;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 10px;
+  }
+  .scroll-hint.visible {
+    display: flex;
   }
   thead th {
     position: sticky;
@@ -132,8 +150,9 @@
 <body>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Carlam Team Schedule - Admin</h1>
-  <div class="meta">Last updated 27 Aug 2026, 10:31 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
-  <div class="table-wrap">
+  <div class="meta">Last updated 27 Aug 2026, 10:34 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="scroll-hint" id="scrollHint">&larr; Scroll sideways to see everyone &rarr;</div>
+  <div class="table-wrap" id="tableWrap">
     <table>
       <thead>
         <tr><th class="daterow">Date</th><th>Rhodri Lewis</th></tr>
@@ -145,5 +164,29 @@
       </tbody>
     </table>
   </div>
+  
+  <script>
+    (function () {
+      var wrap = document.getElementById('tableWrap');
+      var hint = document.getElementById('scrollHint');
+      if (!wrap || !hint) return;
+      function checkOverflow() {
+        if (wrap.scrollWidth > wrap.clientWidth + 2) {
+          hint.classList.add('visible');
+        } else {
+          hint.classList.remove('visible');
+        }
+      }
+      checkOverflow();
+      window.addEventListener('resize', checkOverflow);
+      wrap.addEventListener('scroll', function () {
+        // Hide the hint once the person's actually scrolled, so it
+        // doesn't sit there nagging after they've found it.
+        if (wrap.scrollLeft > 10) {
+          hint.classList.remove('visible');
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
