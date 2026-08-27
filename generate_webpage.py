@@ -132,8 +132,8 @@ def cell_html(entries) -> str:
         return ""
     blocks = []
     for e in entries:
-        parts = [p for p in [e["status"], e["programme"] or e["title"]] if p]
-        main = html.escape(" - ".join(parts) if parts else (e["title"] or ""))
+        parts = [p for p in [e["programme"], e["status"], e["title"]] if p]
+        main = html.escape(" - ".join(parts) if parts else "")
         block = f'<div class="entry">{main}'
         if e["notes"]:
             block += f'<div class="notes">{html.escape(e["notes"])}</div>'
