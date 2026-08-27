@@ -19,6 +19,18 @@ from pathlib import Path
 
 import requests
 
+# The full staff roster, used to expand a "Everyone" tag on a row into every
+# individual person - so a single company-wide event (e.g. an all-staff
+# meeting) shows up on every calendar and personal schedule automatically,
+# without needing multi-select tagging. Keep this in step with the actual
+# options on the "Person Name" select field in Notion.
+ALL_STAFF = [
+    "Iestyn O'Leary", "Bethan Evans", "Ceri Siggins", "Cerys Pinkman",
+    "Derwena Burt", "Elin Jones", "Euros Llyr Morgan", "Hannah Holton",
+    "Jason Lye-Phillips", "Lara Hughes", "Osian Lewis", "Owain Jones",
+    "Rhodri Lewis", "Wil Williams",
+]
+
 # A private, unguessable suffix mixed into every filename, so links can't be
 # derived just by knowing someone's name - even by someone reading this
 # script, since the actual value is never stored here. It must be supplied
@@ -100,7 +112,7 @@ def extract_row(page):
     else:
         person_name_text = get_plain_text(person_name_prop.get("rich_text", []))
     if person_name_text:
-        people = [person_name_text]
+        people = ALL_STAFF if person_name_text == "Everyone" else [person_name_text]
 
     return {
         "title": title,
