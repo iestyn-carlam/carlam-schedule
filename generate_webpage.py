@@ -144,23 +144,30 @@ def cell_html(entries) -> str:
 
 PAGE_STYLE = """
   body {
+    height: 100vh;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
     padding: 16px;
     background: #fafafa;
     color: #1a1a1a;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
   }
   h1 {
     font-size: 20px;
     margin: 0 0 4px 0;
+    flex-shrink: 0;
   }
   .meta {
     font-size: 13px;
     color: #666;
     margin-bottom: 16px;
+    flex-shrink: 0;
   }
   .table-wrap {
-    max-height: 75vh;
+    flex: 1 1 0;
+    min-height: 0;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
     border: 1px solid #ddd;
@@ -194,6 +201,7 @@ PAGE_STYLE = """
     border-radius: 6px;
     padding: 6px 10px;
     margin-bottom: 10px;
+    flex-shrink: 0;
   }
   .scroll-hint.visible {
     display: flex;
@@ -278,6 +286,7 @@ PAGE_STYLE = """
     font-size: 13px;
     color: #333;
     text-decoration: none;
+    flex-shrink: 0;
   }
   a.back:hover {
     text-decoration: underline;
