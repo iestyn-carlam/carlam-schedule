@@ -20,6 +20,15 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import requests
+
+# The full staff roster, used to expand a "Everyone" tag on a row into every
+# individual person. Keep in step with the "Person Name" select options.
+ALL_STAFF = [
+    "Iestyn O'Leary", "Bethan Evans", "Ceri Siggins", "Cerys Pinkman",
+    "Derwena Burt", "Elin Jones", "Euros Llyr Morgan", "Hannah Holton",
+    "Jason Lye-Phillips", "Lara Hughes", "Osian Lewis", "Owain Jones",
+    "Rhodri Lewis", "Wil Williams",
+]
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
@@ -108,8 +117,8 @@ def extract_row(page):
         person_name_text = (person_name_prop.get("select") or {}).get("name", "")
     else:
         person_name_text = get_plain_text(person_name_prop.get("rich_text", []))
-    if not people and person_name_text:
-        people = [person_name_text]
+    if person_name_text:
+        people = ALL_STAFF if person_name_text == "Everyone" else [person_name_text]
 
     return {
         "title": title,
