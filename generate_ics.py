@@ -99,7 +99,7 @@ def extract_row(page):
         person_name_text = (person_name_prop.get("select") or {}).get("name", "")
     else:
         person_name_text = get_plain_text(person_name_prop.get("rich_text", []))
-    if not people and person_name_text:
+    if person_name_text:
         people = [person_name_text]
 
     return {
@@ -148,7 +148,7 @@ def build_vevent(row) -> str:
         end_date_obj = date.fromisoformat(row["start_date"][:10])
     end = end_date_obj.strftime("%Y%m%d")
 
-    summary_parts = [p for p in [row["status"], row["title"]] if p]
+    summary_parts = [p for p in [row["programme"], row["status"], row["title"]] if p]
     summary = escape_ics_text(" - ".join(summary_parts) or "Untitled")
 
     description_lines = []
