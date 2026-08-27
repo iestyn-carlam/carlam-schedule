@@ -64,6 +64,18 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
+def programme_colour(programme: str) -> str | None:
+    """A consistent pastel colour derived from the programme's name - the
+    same programme always gets the same colour, and new programmes get a
+    sensible colour automatically without needing to update a hardcoded
+    list every time one's added in Notion."""
+    if not programme:
+        return None
+    digest = hashlib.md5(programme.encode("utf-8")).hexdigest()
+    hue = int(digest, 16) % 360
+    return f"hsl({hue}, 65%, 87%)"
+
+
 STATUS_COLOURS = {
     "A/L": "#fff2cc",
     "OFF": "#f4cccc",
@@ -78,6 +90,20 @@ STATUS_COLOURS = {
     "Tentative": "#ead1dc",
 }
 DEFAULT_COLOUR = "#ffffff"
+
+
+def programme_colour(name: str) -> str:
+    """
+    Generates a consistent pastel colour for any programme name, purely from
+    the text itself - so every programme automatically gets its own distinct
+    colour, including ones added in future, with nothing to maintain here.
+    """
+    if not name:
+        return ""
+    h = 0
+    for ch in name:
+        h = (h * 31 + ord(ch)) % 360
+    return f"hsl({h}, 60%, 85%)"
 
 
 def page_suffix(name: str) -> str:
@@ -143,7 +169,9 @@ def cell_html(entries) -> str:
     for e in entries:
         parts = [p for p in [e["programme"], e["status"], e["title"]] if p]
         main = html.escape(" - ".join(parts) if parts else "")
-        block = f'<div class="entry">{main}'
+        colour = programme_colour(e["programme"])
+        style_attr = f' style="background:{colour}"' if colour else ""
+        block = f'<div class="entry"{style_attr}>{main}'
         if e["notes"]:
             block += f'<div class="notes">{html.escape(e["notes"])}</div>'
         block += "</div>"
@@ -188,7 +216,7 @@ PAGE_STYLE = """
   }
   th, td {
     border: 1px solid #e0e0e0;
-    padding: 8px 10px;
+    padding: 6px;
     text-align: left;
     vertical-align: top;
     font-size: 13px;
@@ -279,7 +307,11 @@ PAGE_STYLE = """
     display: table-row-group;
   }
   .entry {
-    margin-bottom: 4px;
+    padding: 4px 6px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    border: 1px solid #b0b0b0;
+    background: #f2f2f2;
   }
   .entry:last-child {
     margin-bottom: 0;
@@ -350,9 +382,7 @@ def build_html(rows, page_title, back_link=None) -> str:
         cells = [f"<th class='daterow'>{date_label}</th>"]
         for person in people:
             entries = grid.get((current, person), [])
-            if entries:
-                colour = STATUS_COLOURS.get(entries[0]["status"], DEFAULT_COLOUR)
-            elif is_weekend:
+            if not entries and is_weekend:
                 colour = "#eaeaea"
             else:
                 colour = "transparent"
