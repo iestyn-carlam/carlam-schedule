@@ -91,6 +91,14 @@ STATUS_COLOURS = {
 }
 DEFAULT_COLOUR = "#ffffff"
 
+# These two statuses matter more operationally than which programme they're
+# under, so they get their own bold, consistent colours that override the
+# programme colour - a strong blue for Delivery, a strong amber for anyone
+# off/on leave, both clearly distinct from the softer programme pastels.
+DELIVERY_COLOUR = "#e63946"
+LEAVE_COLOUR = "#f5a623"
+LEAVE_STATUSES = {"A/L", "TOIL", "OFF"}
+
 
 def programme_colour(name: str) -> str:
     """
@@ -104,6 +112,14 @@ def programme_colour(name: str) -> str:
     for ch in name:
         h = (h * 31 + ord(ch)) % 360
     return f"hsl({h}, 60%, 85%)"
+
+
+def entry_colour(status: str, programme: str) -> str:
+    if status in LEAVE_STATUSES:
+        return LEAVE_COLOUR
+    if status == "Delivery":
+        return DELIVERY_COLOUR
+    return programme_colour(programme)
 
 
 def page_suffix(name: str) -> str:
@@ -169,7 +185,7 @@ def cell_html(entries) -> str:
     for e in entries:
         parts = [p for p in [e["programme"], e["status"], e["title"]] if p]
         main = html.escape(" - ".join(parts) if parts else "")
-        colour = programme_colour(e["programme"])
+        colour = entry_colour(e["status"], e["programme"])
         style_attr = f' style="background:{colour}"' if colour else ""
         block = f'<div class="entry"{style_attr}>{main}'
         if e["notes"]:
