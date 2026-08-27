@@ -114,7 +114,7 @@ def extract_row(page):
         person_name_text = (person_name_prop.get("select") or {}).get("name", "")
     else:
         person_name_text = get_plain_text(person_name_prop.get("rich_text", []))
-    if not people and person_name_text:
+    if person_name_text:
         people = [person_name_text]
     return {
         "title": title,
@@ -161,6 +161,8 @@ PAGE_STYLE = """
   }
   .table-wrap {
     overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
     border: 1px solid #ddd;
     border-radius: 6px;
   }
@@ -175,10 +177,26 @@ PAGE_STYLE = """
     vertical-align: top;
     font-size: 13px;
     white-space: nowrap;
+    min-width: 140px;
   }
   td {
     white-space: normal;
-    min-width: 140px;
+  }
+  .scroll-hint {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #666;
+    background: #fffbe6;
+    border: 1px solid #f0e0a0;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 10px;
+  }
+  .scroll-hint.visible {
+    display: flex;
   }
   thead th {
     position: sticky;
@@ -356,7 +374,8 @@ def build_html(rows, page_title, back_link=None) -> str:
         {''.join(past_rows)}
       </tbody>"""
 
-        table_html = f"""<div class="table-wrap">
+        table_html = f"""<div class="scroll-hint" id="scrollHint">&larr; Scroll sideways to see everyone &rarr;</div>
+  <div class="table-wrap" id="tableWrap">
     <table>
       <thead>
         <tr><th class="daterow">Date</th>{header_cells}</tr>
@@ -368,6 +387,31 @@ def build_html(rows, page_title, back_link=None) -> str:
       </tbody>
     </table>
   </div>"""
+
+    scroll_hint_script = """
+  <script>
+    (function () {
+      var wrap = document.getElementById('tableWrap');
+      var hint = document.getElementById('scrollHint');
+      if (!wrap || !hint) return;
+      function checkOverflow() {
+        if (wrap.scrollWidth > wrap.clientWidth + 2) {
+          hint.classList.add('visible');
+        } else {
+          hint.classList.remove('visible');
+        }
+      }
+      checkOverflow();
+      window.addEventListener('resize', checkOverflow);
+      wrap.addEventListener('scroll', function () {
+        // Hide the hint once the person's actually scrolled, so it
+        // doesn't sit there nagging after they've found it.
+        if (wrap.scrollLeft > 10) {
+          hint.classList.remove('visible');
+        }
+      });
+    })();
+  </script>"""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -383,6 +427,7 @@ def build_html(rows, page_title, back_link=None) -> str:
   <h1>{html.escape(page_title)}</h1>
   <div class="meta">Last updated {generated_at} &middot; refreshes automatically every {AUTO_REFRESH_SECONDS // 60} minutes &middot; keep this tab open for a live view</div>
   {table_html}
+  {scroll_hint_script if people else ""}
 </body>
 </html>
 """
