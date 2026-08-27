@@ -249,6 +249,14 @@ function renderIndex(email, syncedAt) {
 </html>`;
 }
 
+// These two statuses matter more operationally than which programme they're
+// under, so they override the programme colour - a strong blue for
+// Delivery, a strong amber for anyone off/on leave. Must match the
+// constants in generate_webpage.py exactly.
+const DELIVERY_COLOUR = "#e63946";
+const LEAVE_COLOUR = "#f5a623";
+const LEAVE_STATUSES = new Set(["A/L", "TOIL", "OFF"]);
+
 // Same formula as generate_webpage.py's programme_colour(), so a given
 // programme always renders the same pastel colour on both the team grids
 // and this personal view - and automatically works for any programme
@@ -260,6 +268,12 @@ function programmeColour(name) {
     h = (h * 31 + name.charCodeAt(i)) % 360;
   }
   return `hsl(${h}, 60%, 85%)`;
+}
+
+function entryColour(status, programme) {
+  if (LEAVE_STATUSES.has(status)) return LEAVE_COLOUR;
+  if (status === "Delivery") return DELIVERY_COLOUR;
+  return programmeColour(programme) || "#f2f2f2";
 }
 
 function renderPersonalSchedule(personName, rows, syncedAt) {
@@ -287,7 +301,7 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
         });
         const parts = [r.programme, r.status, r.title].filter(Boolean);
         const line = escapeHtml(parts.join(" - ") || "Untitled");
-        const colour = programmeColour(r.programme) || "#f2f2f2";
+        const colour = entryColour(r.status, r.programme);
         const rowClass = isToday ? "today" : isPast ? "past" : "";
         return `<div class="entry ${rowClass}">
           <div class="entry-date">${escapeHtml(dateLabel)}</div>
