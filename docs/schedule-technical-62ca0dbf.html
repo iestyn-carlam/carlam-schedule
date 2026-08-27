@@ -163,8 +163,43 @@
 <body>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Carlam Team Schedule - Technical</h1>
-  <div class="meta">Last updated 27 Aug 2026, 12:41 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
-  <p style="color:#666;font-size:14px;">No entries tagged for this team yet.</p>
+  <div class="meta">Last updated 27 Aug 2026, 12:46 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="scroll-hint" id="scrollHint">&larr; Scroll sideways to see everyone &rarr;</div>
+  <div class="table-wrap" id="tableWrap">
+    <table>
+      <thead>
+        <tr><th class="daterow">Date</th><th>Jason Lye-Phillips</th></tr>
+      </thead>
+      
+      
+      <tbody>
+        <tr><th class='daterow'>Wed 02 Dec 2026</th><td><div class="entry" style="background:hsl(355, 60%, 85%)">External - Online Edit - Wes Glei - External</div></td></tr><tr><th class='daterow'>Thu 03 Dec</th><td><div class="entry" style="background:hsl(355, 60%, 85%)">External - Online Edit - Wes Glei - External</div></td></tr><tr><th class='daterow'>Fri 04 Dec</th><td><div class="entry" style="background:hsl(355, 60%, 85%)">External - Online Edit - Wes Glei - External</div></td></tr>
+      </tbody>
+    </table>
+  </div>
   
+  <script>
+    (function () {
+      var wrap = document.getElementById('tableWrap');
+      var hint = document.getElementById('scrollHint');
+      if (!wrap || !hint) return;
+      function checkOverflow() {
+        if (wrap.scrollWidth > wrap.clientWidth + 2) {
+          hint.classList.add('visible');
+        } else {
+          hint.classList.remove('visible');
+        }
+      }
+      checkOverflow();
+      window.addEventListener('resize', checkOverflow);
+      wrap.addEventListener('scroll', function () {
+        // Hide the hint once the person's actually scrolled, so it
+        // doesn't sit there nagging after they've found it.
+        if (wrap.scrollLeft > 10) {
+          hint.classList.remove('visible');
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
