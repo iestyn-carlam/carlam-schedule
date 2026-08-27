@@ -7,23 +7,30 @@
 <title>Carlam Team Schedule - All Teams</title>
 <style>
   body {
+    height: 100vh;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
     padding: 16px;
     background: #fafafa;
     color: #1a1a1a;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
   }
   h1 {
     font-size: 20px;
     margin: 0 0 4px 0;
+    flex-shrink: 0;
   }
   .meta {
     font-size: 13px;
     color: #666;
     margin-bottom: 16px;
+    flex-shrink: 0;
   }
   .table-wrap {
-    max-height: 75vh;
+    flex: 1 1 0;
+    min-height: 0;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
     border: 1px solid #ddd;
@@ -57,6 +64,7 @@
     border-radius: 6px;
     padding: 6px 10px;
     margin-bottom: 10px;
+    flex-shrink: 0;
   }
   .scroll-hint.visible {
     display: flex;
@@ -141,6 +149,7 @@
     font-size: 13px;
     color: #333;
     text-decoration: none;
+    flex-shrink: 0;
   }
   a.back:hover {
     text-decoration: underline;
@@ -150,7 +159,7 @@
 <body>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Carlam Team Schedule - All Teams</h1>
-  <div class="meta">Last updated 27 Aug 2026, 10:46 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="meta">Last updated 27 Aug 2026, 10:48 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
   <div class="scroll-hint" id="scrollHint">&larr; Scroll sideways to see everyone &rarr;</div>
   <div class="table-wrap" id="tableWrap">
     <table>
