@@ -160,8 +160,8 @@ PAGE_STYLE = """
     margin-bottom: 16px;
   }
   .table-wrap {
-    overflow-x: auto;
-    overflow-y: visible;
+    max-height: 75vh;
+    overflow: auto;
     -webkit-overflow-scrolling: touch;
     border: 1px solid #ddd;
     border-radius: 6px;
