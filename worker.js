@@ -41,6 +41,26 @@ const ACCESS_MAP = {
   "wil@carlamltd.com": ["Digital", "Corporate", "Admin"],
 };
 
+// Maps each login email to the exact name used in Notion's "Person Name"
+// select field, so /my-schedule knows whose rows to show. Must match that
+// select field's option spelling exactly (case-sensitive).
+const EMAIL_TO_NAME = {
+  "iestyn@carlamltd.com": "Iestyn O'Leary",
+  "bethan@carlamltd.com": "Bethan Evans",
+  "ceri@carlamltd.com": "Ceri Siggins",
+  "cerys@carlamltd.com": "Cerys Pinkman",
+  "derwena@carlamltd.com": "Derwena Burt",
+  "elin@carlamltd.com": "Elin Jones",
+  "eurosllyr@carlamltd.com": "Euros Llyr Morgan",
+  "hannah@carlamltd.com": "Hannah Holton",
+  "jason@carlamltd.com": "Jason Lye-Phillips",
+  "lara@carlamltd.com": "Lara Hughes",
+  "osh@carlamltd.com": "Osian Lewis",
+  "owain@carlamltd.com": "Owain Jones",
+  "rhodri@carlamltd.com": "Rhodri Lewis",
+  "wil@carlamltd.com": "Wil Williams",
+};
+
 function decodeAccessEmail(request) {
   const jwt = request.headers.get("Cf-Access-Jwt-Assertion");
   if (!jwt) return null;
@@ -175,6 +195,10 @@ function renderIndex(email, syncedAt) {
   const entry = email ? ACCESS_MAP[email] : undefined;
   const links = [];
 
+  if (email && EMAIL_TO_NAME[email]) {
+    links.push(["My Schedule", "my-schedule", "Just your own tasks, day by day"]);
+  }
+
   if (entry === "ALL") {
     links.push(["All Teams (Master)", MASTER_FILE, "Everyone, every team, in one grid"]);
     for (const [team, file] of Object.entries(TEAM_PAGES)) {
@@ -225,6 +249,113 @@ function renderIndex(email, syncedAt) {
 </html>`;
 }
 
+const STATUS_COLOURS = {
+  "A/L": "#fff2cc",
+  "OFF": "#f4cccc",
+  "TOIL": "#f4cccc",
+  "Offline Edit": "#d9ead3",
+  "Online Edit": "#d9ead3",
+  "Finishing": "#cfe2f3",
+  "Delivery": "#c9daf8",
+  "Archive": "#efefef",
+  "Priority task": "#f9cb9c",
+  "Notes / Changes": "#fff2cc",
+  "Tentative": "#ead1dc",
+  "External": "#f9cb9c",
+  "Edit": "#d9ead3",
+  "Paperwork": "#e8d5c4",
+};
+
+function renderPersonalSchedule(personName, rows, syncedAt) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const myRows = rows
+    .filter((r) => r.start_date && Array.isArray(r.people) && r.people.includes(personName))
+    .sort((a, b) => (a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : 0));
+
+  let itemsHtml;
+  if (myRows.length === 0) {
+    itemsHtml = `<div class="empty">Nothing tagged to you yet. If this looks wrong, check with Iestyn.</div>`;
+  } else {
+    itemsHtml = myRows
+      .map((r) => {
+        const d = new Date(r.start_date + "T00:00:00");
+        const isToday = d.getTime() === today.getTime();
+        const isPast = d.getTime() < today.getTime();
+        const dateLabel = d.toLocaleDateString("en-GB", {
+          weekday: "short",
+          day: "2-digit",
+          month: "short",
+          year: d.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+        });
+        const parts = [r.programme, r.status, r.title].filter(Boolean);
+        const line = escapeHtml(parts.join(" - ") || "Untitled");
+        const colour = STATUS_COLOURS[r.status] || "#ffffff";
+        const rowClass = isToday ? "today" : isPast ? "past" : "";
+        return `<div class="entry ${rowClass}">
+          <div class="entry-date">${escapeHtml(dateLabel)}</div>
+          <div class="entry-body" style="background:${colour}">
+            <div class="entry-line">${line}</div>
+            ${r.notes ? `<div class="entry-notes">${escapeHtml(r.notes)}</div>` : ""}
+          </div>
+        </div>`;
+      })
+      .join("");
+  }
+
+  const generatedAt = syncedAt ? escapeHtml(syncedAt) : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+<title>My Schedule - ${escapeHtml(personName)}</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #fafafa;
+    color: #1a1a1a;
+    max-width: 560px;
+  }
+  a.back {
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #333;
+    text-decoration: none;
+  }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .entry { margin-bottom: 10px; }
+  .entry-date { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
+  .entry-body {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .entry-line { font-size: 14px; }
+  .entry-notes { font-size: 12px; color: #555; font-style: italic; margin-top: 4px; }
+  .entry.today .entry-date { color: #26518f; }
+  .entry.today .entry-body { border: 2px solid #3f7fd1; }
+  .entry.past { opacity: 0.55; }
+  .empty { color: #666; font-size: 14px; padding: 16px; background: #fff; border: 1px solid #ddd; border-radius: 8px; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>My Schedule</h1>
+  <div class="meta">${escapeHtml(personName)} &middot; synced ${generatedAt} &middot; refreshes automatically every 2 minutes</div>
+  ${itemsHtml}
+</body>
+</html>`;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -244,6 +375,36 @@ export default {
       }
 
       return new Response(renderIndex(email, syncedAt), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/my-schedule") {
+      const email = decodeAccessEmail(request);
+      const personName = email ? EMAIL_TO_NAME[email] : null;
+
+      if (!personName) {
+        return new Response(
+          "Your account isn't linked to a personal schedule yet. Check with Iestyn.",
+          { status: 200, headers: { "content-type": "text/plain; charset=UTF-8" } }
+        );
+      }
+
+      let rows = [];
+      let syncedAt = null;
+      try {
+        const dataResp = await env.ASSETS.fetch(new URL("/schedule-data.json", request.url));
+        if (dataResp.ok) rows = await dataResp.json();
+        const syncResp = await env.ASSETS.fetch(new URL("/last-sync.json", request.url));
+        if (syncResp.ok) {
+          const data = await syncResp.json();
+          syncedAt = data.synced_at || null;
+        }
+      } catch (err) {
+        console.error("Failed to load schedule data for /my-schedule:", err);
+      }
+
+      return new Response(renderPersonalSchedule(personName, rows, syncedAt), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
