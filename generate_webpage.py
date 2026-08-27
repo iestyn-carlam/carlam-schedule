@@ -551,6 +551,12 @@ def main():
     (OUTPUT_DIR / "last-sync.json").write_text(_json.dumps(sync_info), encoding="utf-8")
     print("Wrote last-sync.json")
 
+    # Raw row data as JSON, so the Worker can build a personalised "My
+    # Schedule" page on the fly for whoever's actually logged in, without
+    # needing a separate static file per person.
+    (OUTPUT_DIR / "schedule-data.json").write_text(_json.dumps(rows), encoding="utf-8")
+    print(f"Wrote schedule-data.json ({len(rows)} rows)")
+
 
 if __name__ == "__main__":
     try:
