@@ -163,17 +163,29 @@
 <body>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Carlam Team Schedule - Admin</h1>
-  <div class="meta">Last updated 30 Aug 2026, 23:56 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="meta">Last updated 31 Aug 2026, 00:00 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
   <div class="scroll-hint" id="scrollHint">&larr; Scroll sideways to see everyone &rarr;</div>
   <div class="table-wrap" id="tableWrap">
     <table>
       <thead>
         <tr><th class="daterow">Date</th><th>Rhodri Lewis</th></tr>
       </thead>
-      
-      
-      <tbody>
+      <tbody id="past-weeks" class="past-weeks">
         <tr><th class='daterow'>Mon 24 Aug 2026</th><td><div class="entry">Paperwork - PAC</div></td></tr><tr><th class='daterow'>Tue 25 Aug</th><td><div class="entry">Paperwork - PAC</div></td></tr><tr><th class='daterow'>Wed 26 Aug</th><td><div class="entry">Paperwork - PAC</div></td></tr><tr><th class='daterow'>Thu 27 Aug</th><td><div class="entry">Paperwork - PAC</div></td></tr>
+      </tbody>
+      <tbody>
+        <tr class="past-toggle-row"><td colspan="2">
+          <div class="past-toggle-wrap">
+            <button type="button" class="past-toggle" onclick="
+              var pw = document.getElementById('past-weeks');
+              var expanded = pw.classList.toggle('expanded');
+              this.textContent = expanded ? '↑ Hide earlier weeks' : '↓ Show earlier weeks (4 days)';
+            ">&darr; Show earlier weeks (4 days)</button>
+          </div>
+        </td></tr>
+      </tbody>
+      <tbody>
+        
       </tbody>
     </table>
   </div>
