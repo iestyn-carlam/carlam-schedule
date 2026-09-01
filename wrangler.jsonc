@@ -6,5 +6,14 @@
     "directory": "./docs",
     "binding": "ASSETS",
     "run_worker_first": ["/", "/index.html"]
-  }
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "LEAVE_KV",
+      "id": "5053aa95944b4388a285d452c2ca521a"
+    }
+  ]
 }
