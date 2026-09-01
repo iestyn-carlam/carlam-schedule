@@ -589,6 +589,17 @@ def main():
         print(f"Wrote {filename} ({len(team_rows)} rows, {team})")
         index_links.append((team, filename, f"{team} team schedule"))
 
+    # Annual Leave - a special cross-team page showing only rows with
+    # Status = A/L, across every team. Restricted to a small list of people
+    # via its own Cloudflare Access policy (see worker.js's homepage link
+    # logic and the matching Access application), not shown to everyone.
+    al_rows = [r for r in rows if r["status"] == "A/L"]
+    al_suffix = page_suffix("schedule-annual-leave")
+    al_filename = f"schedule-annual-leave-{al_suffix}.html"
+    al_html = build_html(al_rows, "Carlam Team Schedule - Annual Leave", back_link="index.html")
+    (OUTPUT_DIR / al_filename).write_text(al_html, encoding="utf-8")
+    print(f"Wrote {al_filename} ({len(al_rows)} A/L rows)")
+
     # Landing page - deliberately at a fixed, unsalted name (index.html) since
     # it's meant to be found. Actual privacy is enforced per-page by
     # Cloudflare Access policies, not by hiding this list.
