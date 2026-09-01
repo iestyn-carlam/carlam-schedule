@@ -24,6 +24,17 @@ const TEAM_PAGES = {
 };
 const MASTER_FILE = "schedule-master-6bc54781.html";
 
+// A special cross-team page, restricted to a small named list rather than
+// the general team/ALL access groups above - only these specific people
+// see the link, and (separately) only these people are actually let in via
+// their own dedicated Cloudflare Access policy on this exact page path.
+const ANNUAL_LEAVE_FILE = "schedule-annual-leave-4b42cdc7.html";
+const ANNUAL_LEAVE_VIEWERS = new Set([
+  "iestyn@carlamltd.com",
+  "eurosllyr@carlamltd.com",
+  "derwena@carlamltd.com",
+]);
+
 const ACCESS_MAP = {
   "iestyn@carlamltd.com": "ALL",
   "bethan@carlamltd.com": "ALL",
@@ -197,6 +208,10 @@ function renderIndex(email, syncedAt) {
 
   if (email && EMAIL_TO_NAME[email]) {
     links.push(["My Schedule", "my-schedule", "Just your own tasks, day by day"]);
+  }
+
+  if (email && ANNUAL_LEAVE_VIEWERS.has(email)) {
+    links.push(["Annual Leave", ANNUAL_LEAVE_FILE, "Everyone's annual leave, all teams, in one view"]);
   }
 
   if (entry === "ALL") {
