@@ -392,6 +392,7 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
 
 const LEAVE_TRACKER_PATH = "/annual-leave-tracker";
 const LEAVE_KV_KEY = "leave-allowances";
+const LEAVE_LOG_KEY = "leave-changelog";
 const DEFAULT_ALLOWANCE = 25;
 
 // Given a stored reset date (any year - only the month/day matter, since
@@ -429,7 +430,23 @@ function countUsedALDays(personName, rows, sinceISODate) {
   ).length;
 }
 
-function renderLeaveTracker(leaveData, rows, message) {
+function formatLogTime(isoString) {
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleString("en-GB", {
+      timeZone: "Europe/London",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch (err) {
+    return isoString;
+  }
+}
+
+function renderLeaveTracker(leaveData, rows, changeLog) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -458,9 +475,17 @@ function renderLeaveTracker(leaveData, rows, message) {
     })
     .join("");
 
-  const messageHtml = message
-    ? `<div class="save-message">${escapeHtml(message)}</div>`
-    : "";
+  const logHtml = (changeLog || []).length
+    ? (changeLog || [])
+        .map(
+          (entry) => `<div class="log-entry">
+            <span class="log-time">${escapeHtml(formatLogTime(entry.time))}</span>
+            <span class="log-by">${escapeHtml(entry.by)}</span>
+            <span class="log-desc">${escapeHtml(entry.person)}: ${escapeHtml(entry.summary)}</span>
+          </div>`
+        )
+        .join("")
+    : `<div class="log-empty">No changes logged yet.</div>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -523,13 +548,47 @@ function renderLeaveTracker(leaveData, rows, message) {
   button.save-btn:hover { background: #2f6bb8; }
   button.save-btn:disabled { background: #999; cursor: default; }
   .save-message { font-size: 13px; color: #2a7a2a; }
+  .log-toggle-wrap { margin-top: 24px; }
+  .log-toggle {
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: #333;
+  }
+  .log-toggle:hover { background: #f0f0f0; }
+  .log-panel {
+    display: none;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .log-panel.visible { display: block; }
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { color: #888; min-width: 140px; }
+  .log-by { font-weight: 600; min-width: 110px; }
+  .log-desc { color: #333; }
+  .log-empty { padding: 14px; color: #888; font-size: 13px; }
 </style>
 </head>
 <body>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Annual Leave Tracker</h1>
   <div class="meta">Allowance and reset dates are editable here directly. "Used" counts A/L days since each person's most recent reset date.</div>
-  ${messageHtml}
   <div class="table-wrap">
     <table>
       <thead>
@@ -549,6 +608,12 @@ function renderLeaveTracker(leaveData, rows, message) {
     <button class="save-btn" id="saveBtn">Save Changes</button>
     <span id="saveStatus" style="font-size:13px;color:#666;"></span>
   </div>
+
+  <div class="log-toggle-wrap">
+    <button type="button" class="log-toggle" id="logToggle">&darr; View change log</button>
+  </div>
+  <div class="log-panel" id="logPanel">${logHtml}</div>
+
   <script>
     document.getElementById('saveBtn').addEventListener('click', async function () {
       const btn = this;
@@ -581,6 +646,12 @@ function renderLeaveTracker(leaveData, rows, message) {
         status.textContent = 'Save failed - check your connection.';
         btn.disabled = false;
       }
+    });
+
+    document.getElementById('logToggle').addEventListener('click', function () {
+      const panel = document.getElementById('logPanel');
+      const expanded = panel.classList.toggle('visible');
+      this.textContent = expanded ? '\u2191 Hide change log' : '\u2193 View change log';
     });
   </script>
 </body>
@@ -681,16 +752,68 @@ export default {
           clean[name] = { allowance, resetDate };
         }
 
+        // Work out exactly what changed, compared to what was there before,
+        // so the log only records real edits, not the whole save action.
+        let previous = {};
+        try {
+          const stored = await env.LEAVE_KV.get(LEAVE_KV_KEY);
+          if (stored) previous = JSON.parse(stored);
+        } catch (err) {
+          console.error("Failed to read previous leave data for diffing:", err);
+        }
+
+        const changedBy = EMAIL_TO_NAME[email] || email;
+        const nowISO = new Date().toISOString();
+        const newLogEntries = [];
+
+        for (const [name, val] of Object.entries(clean)) {
+          const before = previous[name];
+          if (!before) {
+            newLogEntries.push({
+              time: nowISO, by: changedBy, person: name,
+              summary: `Added, allowance ${val.allowance}${val.resetDate ? `, resets ${val.resetDate}` : ""}`,
+            });
+            continue;
+          }
+          if (before.allowance !== val.allowance) {
+            newLogEntries.push({
+              time: nowISO, by: changedBy, person: name,
+              summary: `Allowance changed: ${before.allowance} \u2192 ${val.allowance}`,
+            });
+          }
+          if ((before.resetDate || "") !== (val.resetDate || "")) {
+            newLogEntries.push({
+              time: nowISO, by: changedBy, person: name,
+              summary: `Reset date changed: ${before.resetDate || "(none)"} \u2192 ${val.resetDate || "(none)"}`,
+            });
+          }
+        }
+
+        if (newLogEntries.length > 0) {
+          let log = [];
+          try {
+            const storedLog = await env.LEAVE_KV.get(LEAVE_LOG_KEY);
+            if (storedLog) log = JSON.parse(storedLog);
+          } catch (err) {
+            console.error("Failed to read existing leave change log:", err);
+          }
+          log = [...newLogEntries.reverse(), ...log].slice(0, 300);
+          await env.LEAVE_KV.put(LEAVE_LOG_KEY, JSON.stringify(log));
+        }
+
         await env.LEAVE_KV.put(LEAVE_KV_KEY, JSON.stringify(clean));
-        return new Response(JSON.stringify({ ok: true }), {
+        return new Response(JSON.stringify({ ok: true, changes: newLogEntries.length }), {
           headers: { "content-type": "application/json" },
         });
       }
 
       let leaveData = {};
+      let changeLog = [];
       try {
         const stored = await env.LEAVE_KV.get(LEAVE_KV_KEY);
         if (stored) leaveData = JSON.parse(stored);
+        const storedLog = await env.LEAVE_KV.get(LEAVE_LOG_KEY);
+        if (storedLog) changeLog = JSON.parse(storedLog);
       } catch (err) {
         console.error("Failed to read leave data from KV:", err);
       }
@@ -703,7 +826,7 @@ export default {
         console.error("Failed to load schedule data for leave tracker:", err);
       }
 
-      return new Response(renderLeaveTracker(leaveData, rows, null), {
+      return new Response(renderLeaveTracker(leaveData, rows, changeLog), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
