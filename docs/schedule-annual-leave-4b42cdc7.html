@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+<title>Carlam Team Schedule - Annual Leave</title>
+<style>
+  body {
+    height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #fafafa;
+    color: #1a1a1a;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px 0;
+    flex-shrink: 0;
+  }
+  .meta {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+  }
+  .table-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
+  table {
+    border-collapse: collapse;
+    min-width: 100%;
+  }
+  th, td {
+    border: 1px solid #e0e0e0;
+    padding: 6px;
+    text-align: left;
+    vertical-align: top;
+    font-size: 13px;
+    white-space: nowrap;
+    min-width: 140px;
+  }
+  td {
+    white-space: normal;
+  }
+  .scroll-hint {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #666;
+    background: #fffbe6;
+    border: 1px solid #f0e0a0;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+  .scroll-hint.visible {
+    display: flex;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #333;
+    color: #fff;
+    z-index: 2;
+  }
+  .daterow {
+    position: sticky;
+    left: 0;
+    background: #f0f0f0;
+    z-index: 1;
+    font-weight: 600;
+  }
+  thead th.daterow {
+    background: #333;
+    color: #fff;
+    z-index: 3;
+  }
+  tr.weekend .daterow {
+    background: #d6d6d6;
+    border-left: 4px solid #999;
+  }
+  tr.weekend td {
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+  }
+  tr.today .daterow {
+    background: #3f7fd1;
+    color: #fff;
+    border-left: 4px solid #26518f;
+  }
+  tr.today td {
+    background: rgba(63, 127, 209, 0.10);
+    border-top: 1px solid #3f7fd1;
+    border-bottom: 1px solid #3f7fd1;
+  }
+  .past-toggle-row td {
+    padding: 0;
+    border: none;
+  }
+  .past-toggle-wrap {
+    padding: 6px 0 12px 0;
+  }
+  .past-toggle {
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: #333;
+  }
+  .past-toggle:hover {
+    background: #f0f0f0;
+  }
+  tbody.past-weeks {
+    display: none;
+  }
+  tbody.past-weeks.expanded {
+    display: table-row-group;
+  }
+  .entry {
+    padding: 4px 6px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    border: 1px solid #b0b0b0;
+    background: #f2f2f2;
+  }
+  .entry:last-child {
+    margin-bottom: 0;
+  }
+  .notes {
+    font-size: 11px;
+    color: #555;
+    font-style: italic;
+  }
+  a.back {
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #333;
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+  a.back:hover {
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Carlam Team Schedule - Annual Leave</h1>
+  <div class="meta">Last updated 01 Sep 2026, 14:33 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="scroll-hint" id="scrollHint">&larr; Scroll sideways to see everyone &rarr;</div>
+  <div class="table-wrap" id="tableWrap">
+    <table>
+      <thead>
+        <tr><th class="daterow">Date</th><th>Bethan Evans</th><th>Cerys Pinkman</th><th>Elin Jones</th><th>Euros Llyr Morgan</th><th>Jason Lye-Phillips</th><th>Lara Hughes</th><th>Osian Lewis</th><th>Owain Jones</th><th>Rhodri Lewis</th></tr>
+      </thead>
+      <tbody id="past-weeks" class="past-weeks">
+        <tr><th class='daterow'>Mon 24 Aug 2026</th><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Tue 25 Aug</th><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Wed 26 Aug</th><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td></tr><tr><th class='daterow'>Thu 27 Aug</th><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - 1/2 Day Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td></tr><tr><th class='daterow'>Fri 28 Aug</th><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td></tr><tr class="weekend"><th class='daterow'>Sat 29 Aug</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 30 Aug</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr>
+      </tbody>
+      <tbody>
+        <tr class="past-toggle-row"><td colspan="10">
+          <div class="past-toggle-wrap">
+            <button type="button" class="past-toggle" onclick="
+              var pw = document.getElementById('past-weeks');
+              var expanded = pw.classList.toggle('expanded');
+              this.textContent = expanded ? '↑ Hide earlier weeks' : '↓ Show earlier weeks (7 days)';
+            ">&darr; Show earlier weeks (7 days)</button>
+          </div>
+        </td></tr>
+      </tbody>
+      <tbody>
+        <tr><th class='daterow'>Mon 31 Aug</th><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td><td></td></tr><tr class="today"><th class='daterow'>Tue 01 Sep</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Wed 02 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Thu 03 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Fri 04 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr class="weekend"><th class='daterow'>Sat 05 Sep</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 06 Sep</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 07 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Tue 08 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Wed 09 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Thu 10 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Fri 11 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr class="weekend"><th class='daterow'>Sat 12 Sep</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 13 Sep</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 14 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Tue 15 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Wed 16 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Thu 17 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Fri 18 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr class="weekend"><th class='daterow'>Sat 19 Sep</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 20 Sep</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 21 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Tue 22 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Wed 23 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Thu 24 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Fri 25 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr class="weekend"><th class='daterow'>Sat 26 Sep</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 27 Sep</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 28 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Tue 29 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr><th class='daterow'>Wed 30 Sep</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td></tr><tr><th class='daterow'>Thu 01 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td></tr><tr><th class='daterow'>Fri 02 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td></tr><tr class="weekend"><th class='daterow'>Sat 03 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 04 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 05 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td></tr><tr><th class='daterow'>Tue 06 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td></tr><tr><th class='daterow'>Wed 07 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td></tr><tr><th class='daterow'>Thu 08 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Fri 09 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr class="weekend"><th class='daterow'>Sat 10 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 11 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 12 Oct</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Tue 13 Oct</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Wed 14 Oct</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Thu 15 Oct</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Fri 16 Oct</th><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr class="weekend"><th class='daterow'>Sat 17 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 18 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 19 Oct</th><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Tue 20 Oct</th><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Wed 21 Oct</th><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Thu 22 Oct</th><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Fri 23 Oct</th><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td></tr><tr class="weekend"><th class='daterow'>Sat 24 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 25 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 26 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Tue 27 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Wed 28 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Thu 29 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Fri 30 Oct</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr class="weekend"><th class='daterow'>Sat 31 Oct</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 01 Nov</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 02 Nov</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Tue 03 Nov</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Wed 04 Nov</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Thu 05 Nov</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Fri 06 Nov</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td></tr><tr class="weekend"><th class='daterow'>Sat 07 Nov</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr class="weekend"><th class='daterow'>Sun 08 Nov</th><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td><td style="background:#eaeaea"></td></tr><tr><th class='daterow'>Mon 09 Nov</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Tue 10 Nov</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Wed 11 Nov</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Thu 12 Nov</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th class='daterow'>Fri 13 Nov</th><td></td><td><div class="entry" style="background:#f5a623">A/L - Annual Leave</div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <script>
+    (function () {
+      var wrap = document.getElementById('tableWrap');
+      var hint = document.getElementById('scrollHint');
+      if (!wrap || !hint) return;
+      function checkOverflow() {
+        if (wrap.scrollWidth > wrap.clientWidth + 2) {
+          hint.classList.add('visible');
+        } else {
+          hint.classList.remove('visible');
+        }
+      }
+      checkOverflow();
+      window.addEventListener('resize', checkOverflow);
+      wrap.addEventListener('scroll', function () {
+        // Hide the hint once the person's actually scrolled, so it
+        // doesn't sit there nagging after they've found it.
+        if (wrap.scrollLeft > 10) {
+          hint.classList.remove('visible');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
