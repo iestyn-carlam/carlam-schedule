@@ -427,8 +427,12 @@ def build_html(rows, page_title, back_link=None) -> str:
         <tr class="past-toggle-row"><td colspan="{col_count}">
           <div class="past-toggle-wrap">
             <button type="button" class="past-toggle" onclick="
+              var wrap = document.getElementById('tableWrap');
               var pw = document.getElementById('past-weeks');
+              var beforeHeight = wrap.scrollHeight;
               var expanded = pw.classList.toggle('expanded');
+              var afterHeight = wrap.scrollHeight;
+              wrap.scrollTop += (afterHeight - beforeHeight);
               this.textContent = expanded ? '\u2191 Hide earlier weeks' : '\u2193 Show earlier weeks ({len(past_rows)} days)';
             ">&darr; Show earlier weeks ({len(past_rows)} days)</button>
           </div>
