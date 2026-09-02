@@ -617,7 +617,10 @@ def main():
     # it's GMT or British Summer Time, rather than a fixed UTC offset.
     import json as _json
     uk_now = datetime.now(ZoneInfo("Europe/London"))
-    sync_info = {"synced_at": uk_now.strftime("%H:%M:%S")}
+    sync_info = {
+        "synced_at": uk_now.strftime("%H:%M:%S"),
+        "synced_at_iso": datetime.now(ZoneInfo("UTC")).isoformat(),
+    }
     (OUTPUT_DIR / "last-sync.json").write_text(_json.dumps(sync_info), encoding="utf-8")
     print("Wrote last-sync.json")
 
