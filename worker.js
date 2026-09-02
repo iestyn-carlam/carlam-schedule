@@ -109,15 +109,19 @@ const PAGE_STYLE = `
   body {
     margin: 0;
     min-height: 100vh;
-    background: var(--bg);
+    background:
+      radial-gradient(circle at 50% -10%, rgba(63,127,209,0.16), transparent 55%),
+      radial-gradient(circle at 90% 15%, rgba(63,127,209,0.08), transparent 45%),
+      radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px) 0 0/26px 26px,
+      var(--bg);
     color: var(--text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     display: flex;
     justify-content: center;
-    padding: 48px 20px 64px;
+    padding: 64px 24px 80px;
   }
   .page { width: 100%; max-width: 780px; }
-  .logo-wrap { text-align: center; margin-bottom: 28px; }
+  .logo-wrap { text-align: center; margin-bottom: 36px; }
   .logo-wrap img { width: 120px; height: auto; display: inline-block; }
   h1 {
     font-family: 'Space Grotesk', sans-serif;
@@ -155,13 +159,53 @@ const PAGE_STYLE = `
     70%  { box-shadow: 0 0 0 7px rgba(63, 127, 209, 0); }
     100% { box-shadow: 0 0 0 0 rgba(63, 127, 209, 0); }
   }
+  .widgets {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-bottom: 36px;
+  }
+  .widget {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .widget-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  .widget-body {
+    font-size: 14px;
+    color: var(--text);
+  }
+  .headlines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .headlines li a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .headlines li a:hover { color: var(--accent); }
   ul.links {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 10px;
+    gap: 14px;
   }
   ul.links li { margin-bottom: 0; }
   ul.links a {
@@ -207,7 +251,7 @@ const PAGE_STYLE = `
   }
 `;
 
-function renderIndex(email, syncedAt) {
+function renderIndex(email, syncedAt, headlines) {
   const entry = email ? ACCESS_MAP[email] : undefined;
   const links = [];
 
@@ -251,6 +295,55 @@ function renderIndex(email, syncedAt) {
     ? `<div class="status"><span class="dot"></span>synced <span>${escapeHtml(syncedAt)}</span></div>`
     : `<div class="status"><span class="dot"></span>live</div>`;
 
+  const headlinesHtml = (headlines && headlines.length)
+    ? headlines
+        .map((h) => `<li><a href="${escapeHtml(h.link)}" target="_blank" rel="noopener">${escapeHtml(h.title)}</a></li>`)
+        .join("")
+    : `<li style="color:var(--text-dim);font-size:13px;">Headlines unavailable right now.</li>`;
+
+  const widgetsHtml = `<div class="widgets">
+    <div class="widget">
+      <div class="widget-label">Weather</div>
+      <div class="widget-body" id="weatherBody">Checking your location&hellip;</div>
+    </div>
+    <div class="widget">
+      <div class="widget-label">UK Headlines</div>
+      <ul class="headlines">${headlinesHtml}</ul>
+    </div>
+  </div>`;
+
+  const weatherScript = `<script>
+    (function () {
+      var body = document.getElementById('weatherBody');
+      if (!body) return;
+      if (!navigator.geolocation) {
+        body.textContent = 'Location not available in this browser.';
+        return;
+      }
+      var codeMap = {
+        0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+        45: 'Foggy', 48: 'Foggy', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
+        61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 71: 'Light snow', 73: 'Snow',
+        75: 'Heavy snow', 80: 'Rain showers', 81: 'Rain showers', 82: 'Violent showers',
+        95: 'Thunderstorm',
+      };
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var lat = pos.coords.latitude, lon = pos.coords.longitude;
+        fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current_weather=true')
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            var cw = data && data.current_weather;
+            if (!cw) { body.textContent = 'Could not load weather.'; return; }
+            var desc = codeMap[cw.weathercode] || 'Weather';
+            body.textContent = Math.round(cw.temperature) + '\\u00b0C, ' + desc;
+          })
+          .catch(function () { body.textContent = 'Could not load weather.'; });
+      }, function () {
+        body.textContent = 'Location permission denied.';
+      });
+    })();
+  </script>`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -264,8 +357,10 @@ function renderIndex(email, syncedAt) {
     <div class="logo-wrap"><img src="/carlam-logo.png" alt="Carlam"></div>
     <h1>Schedules</h1>
     ${statusHtml}
+    ${widgetsHtml}
     <ul class="links">${itemsHtml}</ul>
   </div>
+  ${weatherScript}
 </body>
 </html>`;
 }
@@ -668,6 +763,24 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
 </html>`;
 }
 
+function parseRssHeadlines(xmlText, limit) {
+  const items = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
+  while ((match = itemRegex.exec(xmlText)) !== null && items.length < limit) {
+    const block = match[1];
+    const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/);
+    const linkMatch = block.match(/<link>([\s\S]*?)<\/link>/);
+    if (titleMatch && linkMatch) {
+      let title = titleMatch[1].trim();
+      title = title.replace(/^<!\[CDATA\[/, "").replace(/\]\]>$/, "");
+      const link = linkMatch[1].trim();
+      items.push({ title, link });
+    }
+  }
+  return items;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -686,7 +799,24 @@ export default {
         // If this fails for any reason, the page still renders fine without it.
       }
 
-      return new Response(renderIndex(email, syncedAt), {
+      let headlines = [];
+      try {
+        const newsController = new AbortController();
+        const newsTimeout = setTimeout(() => newsController.abort(), 3000);
+        const newsResp = await fetch("https://feeds.bbci.co.uk/news/uk/rss.xml", {
+          signal: newsController.signal,
+        });
+        clearTimeout(newsTimeout);
+        if (newsResp.ok) {
+          const xmlText = await newsResp.text();
+          headlines = parseRssHeadlines(xmlText, 5);
+        }
+      } catch (err) {
+        // Headlines are a nice-to-have - if BBC is slow or unreachable, the
+        // homepage still renders fine without them.
+      }
+
+      return new Response(renderIndex(email, syncedAt, headlines), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
