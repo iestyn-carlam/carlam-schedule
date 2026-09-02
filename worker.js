@@ -110,8 +110,6 @@ const PAGE_STYLE = `
     margin: 0;
     min-height: 100vh;
     background:
-      radial-gradient(circle at 50% -10%, rgba(63,127,209,0.16), transparent 55%),
-      radial-gradient(circle at 90% 15%, rgba(63,127,209,0.08), transparent 45%),
       radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px) 0 0/26px 26px,
       var(--bg);
     color: var(--text);
@@ -146,8 +144,8 @@ const PAGE_STYLE = `
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 0 rgba(63, 127, 209, 0.6);
+    background: var(--dot-color, #2ecc71);
+    box-shadow: 0 0 0 0 var(--dot-glow, rgba(46, 204, 113, 0.6));
     animation: pulse 2.2s infinite;
     flex-shrink: 0;
   }
@@ -155,34 +153,75 @@ const PAGE_STYLE = `
     .dot { animation: none; }
   }
   @keyframes pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(63, 127, 209, 0.55); }
-    70%  { box-shadow: 0 0 0 7px rgba(63, 127, 209, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(63, 127, 209, 0); }
+    0%   { box-shadow: 0 0 0 0 var(--dot-glow, rgba(46, 204, 113, 0.55)); }
+    70%  { box-shadow: 0 0 0 7px rgba(0, 0, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+  }
+  .sync-error {
+    display: none;
+    margin: -20px auto 24px;
+    max-width: 420px;
+    background: rgba(231, 76, 60, 0.12);
+    border: 1px solid rgba(231, 76, 60, 0.4);
+    color: #ff8a80;
+    font-size: 12px;
+    text-align: center;
+    padding: 8px 14px;
+    border-radius: 8px;
   }
   .widgets {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 14px;
-    margin-bottom: 36px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
   }
   .widget {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 18px;
+    border-radius: 10px;
+    padding: 12px 14px;
   }
   .widget-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-dim);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
-  .widget-body {
-    font-size: 14px;
-    color: var(--text);
+  .widget-body { font-size: 13px; color: var(--text); }
+  .weather-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .weather-icon { font-size: 30px; line-height: 1; }
+  .weather-temp { font-size: 22px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
+  .weather-desc { font-size: 12px; color: var(--text-dim); }
+  .weather-details {
+    margin-top: 8px;
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .bbc-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: #bb1919;
+    color: #fff;
+    font-size: 8px;
+    font-weight: 700;
+    border-radius: 3px;
+    flex-shrink: 0;
   }
   .headlines {
     list-style: none;
@@ -190,15 +229,30 @@ const PAGE_STYLE = `
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
+    max-height: 220px;
+    overflow-y: auto;
   }
-  .headlines li a {
+  .headline-item { display: flex; gap: 8px; align-items: flex-start; }
+  .headline-item a {
     color: var(--text);
     text-decoration: none;
-    font-size: 13px;
-    line-height: 1.4;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    display: block;
   }
-  .headlines li a:hover { color: var(--accent); }
+  .headline-item a:hover { color: var(--accent); }
+  .headline-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
   ul.links {
     list-style: none;
     margin: 0;
@@ -251,7 +305,7 @@ const PAGE_STYLE = `
   }
 `;
 
-function renderIndex(email, syncedAt, headlines) {
+function renderIndex(email, syncedAt, headlines, syncedAtIso) {
   const entry = email ? ACCESS_MAP[email] : undefined;
   const links = [];
 
@@ -292,14 +346,24 @@ function renderIndex(email, syncedAt, headlines) {
     : `<li><div class="empty">No schedules are assigned to your account yet.<br>If this looks wrong, check with Iestyn.</div></li>`;
 
   const statusHtml = syncedAt
-    ? `<div class="status"><span class="dot"></span>synced <span>${escapeHtml(syncedAt)}</span></div>`
-    : `<div class="status"><span class="dot"></span>live</div>`;
+    ? `<div class="status"><span class="dot" id="syncDot"></span>synced <span id="syncedTimeText">${escapeHtml(syncedAt)}</span></div>`
+    : `<div class="status"><span class="dot" id="syncDot"></span>live</div>`;
+
+  const syncErrorHtml = `<div class="sync-error" id="syncError">There's a sync issue &mdash; contact the admin (Iestyn).</div>`;
 
   const headlinesHtml = (headlines && headlines.length)
     ? headlines
-        .map((h) => `<li><a href="${escapeHtml(h.link)}" target="_blank" rel="noopener">${escapeHtml(h.title)}</a></li>`)
+        .map(
+          (h) => `<li class="headline-item">
+            <span class="bbc-badge">BBC</span>
+            <div>
+              <a href="${escapeHtml(h.link)}" target="_blank" rel="noopener">${escapeHtml(h.title)}</a>
+              ${h.description ? `<div class="headline-desc">${escapeHtml(h.description)}</div>` : ""}
+            </div>
+          </li>`
+        )
         .join("")
-    : `<li style="color:var(--text-dim);font-size:13px;">Headlines unavailable right now.</li>`;
+    : `<li style="color:var(--text-dim);font-size:12px;">Headlines unavailable right now.</li>`;
 
   const widgetsHtml = `<div class="widgets">
     <div class="widget">
@@ -307,7 +371,7 @@ function renderIndex(email, syncedAt, headlines) {
       <div class="widget-body" id="weatherBody">Checking your location&hellip;</div>
     </div>
     <div class="widget">
-      <div class="widget-label">UK Headlines</div>
+      <div class="widget-label"><span class="bbc-badge">BBC</span> UK Headlines</div>
       <ul class="headlines">${headlinesHtml}</ul>
     </div>
   </div>`;
@@ -315,32 +379,100 @@ function renderIndex(email, syncedAt, headlines) {
   const weatherScript = `<script>
     (function () {
       var body = document.getElementById('weatherBody');
-      if (!body) return;
-      if (!navigator.geolocation) {
-        body.textContent = 'Location not available in this browser.';
-        return;
+      if (body) {
+        if (!navigator.geolocation) {
+          body.textContent = 'Location not available in this browser.';
+        } else {
+          var iconMap = {
+            0: '\\u2600\\uFE0F', 1: '\\uD83C\\uDF24\\uFE0F', 2: '\\u26C5', 3: '\\u2601\\uFE0F',
+            45: '\\uD83C\\uDF2B\\uFE0F', 48: '\\uD83C\\uDF2B\\uFE0F',
+            51: '\\uD83C\\uDF26\\uFE0F', 53: '\\uD83C\\uDF26\\uFE0F', 55: '\\uD83C\\uDF27\\uFE0F',
+            61: '\\uD83C\\uDF26\\uFE0F', 63: '\\uD83C\\uDF27\\uFE0F', 65: '\\uD83C\\uDF27\\uFE0F',
+            71: '\\uD83C\\uDF28\\uFE0F', 73: '\\uD83C\\uDF28\\uFE0F', 75: '\\uD83C\\uDF28\\uFE0F',
+            80: '\\uD83C\\uDF26\\uFE0F', 81: '\\uD83C\\uDF27\\uFE0F', 82: '\\u26C8\\uFE0F',
+            95: '\\u26C8\\uFE0F',
+          };
+          var codeMap = {
+            0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+            45: 'Foggy', 48: 'Foggy', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
+            61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 71: 'Light snow', 73: 'Snow',
+            75: 'Heavy snow', 80: 'Rain showers', 81: 'Rain showers', 82: 'Violent showers',
+            95: 'Thunderstorm',
+          };
+          navigator.geolocation.getCurrentPosition(function (pos) {
+            var lat = pos.coords.latitude, lon = pos.coords.longitude;
+            var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon
+              + '&current_weather=true&hourly=relative_humidity_2m,apparent_temperature'
+              + '&daily=temperature_2m_max,temperature_2m_min&timezone=auto';
+            fetch(url)
+              .then(function (r) { return r.json(); })
+              .then(function (data) {
+                var cw = data && data.current_weather;
+                if (!cw) { body.textContent = 'Could not load weather.'; return; }
+                var icon = iconMap[cw.weathercode] || '\\uD83C\\uDF24\\uFE0F';
+                var desc = codeMap[cw.weathercode] || 'Weather';
+                var feelsLike = null, humidity = null;
+                if (data.hourly && data.hourly.time) {
+                  var idx = data.hourly.time.indexOf(cw.time);
+                  if (idx === -1) idx = 0;
+                  if (data.hourly.apparent_temperature) feelsLike = Math.round(data.hourly.apparent_temperature[idx]);
+                  if (data.hourly.relative_humidity_2m) humidity = data.hourly.relative_humidity_2m[idx];
+                }
+                var hi = null, lo = null;
+                if (data.daily && data.daily.temperature_2m_max) {
+                  hi = Math.round(data.daily.temperature_2m_max[0]);
+                  lo = Math.round(data.daily.temperature_2m_min[0]);
+                }
+                var html = '<div class="weather-main">'
+                  + '<span class="weather-icon">' + icon + '</span>'
+                  + '<div><div class="weather-temp">' + Math.round(cw.temperature) + '\\u00b0C</div>'
+                  + '<div class="weather-desc">' + desc + '</div></div></div>';
+                var details = [];
+                if (feelsLike !== null) details.push('Feels ' + feelsLike + '\\u00b0');
+                if (hi !== null) details.push('H:' + hi + '\\u00b0 L:' + lo + '\\u00b0');
+                if (humidity !== null) details.push(humidity + '% humidity');
+                if (details.length) html += '<div class="weather-details">' + details.join(' &middot; ') + '</div>';
+                body.innerHTML = html;
+              })
+              .catch(function () { body.textContent = 'Could not load weather.'; });
+          }, function () {
+            body.textContent = 'Location permission denied.';
+          });
+        }
       }
-      var codeMap = {
-        0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
-        45: 'Foggy', 48: 'Foggy', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
-        61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 71: 'Light snow', 73: 'Snow',
-        75: 'Heavy snow', 80: 'Rain showers', 81: 'Rain showers', 82: 'Violent showers',
-        95: 'Thunderstorm',
-      };
-      navigator.geolocation.getCurrentPosition(function (pos) {
-        var lat = pos.coords.latitude, lon = pos.coords.longitude;
-        fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current_weather=true')
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            var cw = data && data.current_weather;
-            if (!cw) { body.textContent = 'Could not load weather.'; return; }
-            var desc = codeMap[cw.weathercode] || 'Weather';
-            body.textContent = Math.round(cw.temperature) + '\\u00b0C, ' + desc;
-          })
-          .catch(function () { body.textContent = 'Could not load weather.'; });
-      }, function () {
-        body.textContent = 'Location permission denied.';
-      });
+
+      // Sync status dot: green when fresh, fading through yellow to red the
+      // longer it's been since the last successful sync. Past 10 minutes
+      // (double the normal 5-minute sync interval), shows a clear error.
+      var syncedAtMs = ${syncedAtIso ? `new Date(${JSON.stringify(syncedAtIso)}).getTime()` : "null"};
+      var dot = document.getElementById('syncDot');
+      var errorBox = document.getElementById('syncError');
+      if (syncedAtMs && dot) {
+        var GREEN = [46, 204, 113], YELLOW = [241, 196, 15], RED = [231, 76, 60];
+        function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
+        function mix(c1, c2, t) {
+          return [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
+        }
+        function updateDot() {
+          var elapsed = (Date.now() - syncedAtMs) / 1000;
+          var c, isError = false;
+          if (elapsed <= 300) {
+            c = mix(GREEN, YELLOW, elapsed / 300);
+          } else if (elapsed <= 600) {
+            c = mix(YELLOW, RED, (elapsed - 300) / 300);
+          } else {
+            c = RED;
+            isError = true;
+          }
+          var rgb = 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+          var rgba = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0.55)';
+          document.documentElement.style.setProperty('--dot-color', rgb);
+          document.documentElement.style.setProperty('--dot-glow', rgba);
+          if (errorBox) errorBox.style.display = isError ? 'block' : 'none';
+        }
+        updateDot();
+        setInterval(updateDot, 5000);
+      }
     })();
   </script>`;
 
@@ -357,6 +489,7 @@ function renderIndex(email, syncedAt, headlines) {
     <div class="logo-wrap"><img src="/carlam-logo.png" alt="Carlam"></div>
     <h1>Schedules</h1>
     ${statusHtml}
+    ${syncErrorHtml}
     ${widgetsHtml}
     <ul class="links">${itemsHtml}</ul>
   </div>
@@ -771,11 +904,20 @@ function parseRssHeadlines(xmlText, limit) {
     const block = match[1];
     const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/);
     const linkMatch = block.match(/<link>([\s\S]*?)<\/link>/);
+    const descMatch = block.match(/<description>([\s\S]*?)<\/description>/);
     if (titleMatch && linkMatch) {
       let title = titleMatch[1].trim();
       title = title.replace(/^<!\[CDATA\[/, "").replace(/\]\]>$/, "");
       const link = linkMatch[1].trim();
-      items.push({ title, link });
+      let description = "";
+      if (descMatch) {
+        description = descMatch[1]
+          .replace(/^<!\[CDATA\[/, "")
+          .replace(/\]\]>$/, "")
+          .replace(/<[^>]+>/g, "")
+          .trim();
+      }
+      items.push({ title, link, description });
     }
   }
   return items;
@@ -789,11 +931,13 @@ export default {
       const email = decodeAccessEmail(request);
 
       let syncedAt = null;
+      let syncedAtIso = null;
       try {
         const syncResp = await env.ASSETS.fetch(new URL("/last-sync.json", request.url));
         if (syncResp.ok) {
           const data = await syncResp.json();
           syncedAt = data.synced_at || null;
+          syncedAtIso = data.synced_at_iso || null;
         }
       } catch (err) {
         // If this fails for any reason, the page still renders fine without it.
@@ -816,7 +960,7 @@ export default {
         // homepage still renders fine without them.
       }
 
-      return new Response(renderIndex(email, syncedAt, headlines), {
+      return new Response(renderIndex(email, syncedAt, headlines, syncedAtIso), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
