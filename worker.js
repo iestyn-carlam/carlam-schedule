@@ -449,7 +449,12 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
   today.setHours(0, 0, 0, 0);
 
   // Everyone with a real name is eligible to appear here, in a stable order.
-  const people = Object.values(EMAIL_TO_NAME).sort();
+  // People excluded from this specific tracker (not removed from the
+  // system generally - they still keep their normal schedule access etc).
+  const LEAVE_TRACKER_EXCLUDED = new Set(["Ceri Siggins"]);
+  const people = Object.values(EMAIL_TO_NAME)
+    .filter((name) => !LEAVE_TRACKER_EXCLUDED.has(name))
+    .sort();
 
   const rowsHtml = people
     .map((name) => {
