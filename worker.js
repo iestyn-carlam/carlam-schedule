@@ -653,7 +653,10 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
       if (!btn) return;
       btn.addEventListener('click', function () {
         var panel = document.getElementById('pastEntries');
+        var beforeHeight = document.documentElement.scrollHeight;
         var expanded = panel.classList.toggle('visible');
+        var afterHeight = document.documentElement.scrollHeight;
+        window.scrollBy(0, afterHeight - beforeHeight);
         var count = panel.children.length;
         this.textContent = expanded ? '\u2191 Hide earlier' : '\u2193 Show earlier (' + count + ')';
       });
