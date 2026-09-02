@@ -593,7 +593,7 @@ def main():
     # Status = A/L, across every team. Restricted to a small list of people
     # via its own Cloudflare Access policy (see worker.js's homepage link
     # logic and the matching Access application), not shown to everyone.
-    al_rows = [r for r in rows if r["status"] == "A/L"]
+    al_rows = [r for r in rows if r["status"] in ("A/L", "A/L (Half Day)")]
     al_suffix = page_suffix("schedule-annual-leave")
     al_filename = f"schedule-annual-leave-{al_suffix}.html"
     al_html = build_html(al_rows, "Carlam Team Schedule - Annual Leave", back_link="index.html")
