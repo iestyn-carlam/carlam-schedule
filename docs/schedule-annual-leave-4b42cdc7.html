@@ -163,7 +163,7 @@
 <body>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Carlam Team Schedule - Annual Leave</h1>
-  <div class="meta">Last updated 02 Sep 2026, 12:10 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="meta">Last updated 02 Sep 2026, 12:11 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
   <div class="scroll-hint" id="scrollHint">&larr; Scroll sideways to see everyone &rarr;</div>
   <div class="table-wrap" id="tableWrap">
     <table>
@@ -177,8 +177,12 @@
         <tr class="past-toggle-row"><td colspan="12">
           <div class="past-toggle-wrap">
             <button type="button" class="past-toggle" onclick="
+              var wrap = document.getElementById('tableWrap');
               var pw = document.getElementById('past-weeks');
+              var beforeHeight = wrap.scrollHeight;
               var expanded = pw.classList.toggle('expanded');
+              var afterHeight = wrap.scrollHeight;
+              wrap.scrollTop += (afterHeight - beforeHeight);
               this.textContent = expanded ? '↑ Hide earlier weeks' : '↓ Show earlier weeks (285 days)';
             ">&darr; Show earlier weeks (285 days)</button>
           </div>
