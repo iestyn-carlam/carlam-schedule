@@ -418,14 +418,14 @@ function toISODateString(d) {
 
 function countUsedALDays(personName, rows, sinceISODate) {
   if (!sinceISODate) return 0;
-  return rows.filter(
-    (r) =>
-      r.status === "A/L" &&
-      Array.isArray(r.people) &&
-      r.people.includes(personName) &&
-      r.start_date &&
-      r.start_date >= sinceISODate
-  ).length;
+  let total = 0;
+  for (const r of rows) {
+    if (!Array.isArray(r.people) || !r.people.includes(personName)) continue;
+    if (!r.start_date || r.start_date < sinceISODate) continue;
+    if (r.status === "A/L") total += 1;
+    else if (r.status === "A/L (Half Day)") total += 0.5;
+  }
+  return total;
 }
 
 function formatLogTime(isoString) {
