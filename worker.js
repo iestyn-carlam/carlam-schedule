@@ -264,6 +264,17 @@ const PAGE_STYLE = `
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  .link-group { margin-bottom: 28px; }
+  .link-group:last-child { margin-bottom: 0; }
+  .group-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin: 0 0 12px 0;
+  }
   ul.links {
     list-style: none;
     margin: 0;
@@ -319,44 +330,61 @@ const PAGE_STYLE = `
 
 function renderIndex(email, syncedAt, headlines, syncedAtIso) {
   const entry = email ? ACCESS_MAP[email] : undefined;
-  const links = [];
+
+  const myScheduleLinks = [];
+  const masterLinks = [];
+  const trackerLinks = [];
+  const teamLinks = [];
 
   if (email && EMAIL_TO_NAME[email]) {
-    links.push(["My Schedule", "my-schedule", "Just your own tasks, day by day"]);
+    myScheduleLinks.push(["My Schedule", "my-schedule", "Just your own tasks, day by day"]);
   }
 
   if (email && ANNUAL_LEAVE_VIEWERS.has(email)) {
-    links.push(["Annual Leave", ANNUAL_LEAVE_FILE, "Everyone's annual leave, all teams, in one view"]);
-    links.push(["Annual Leave Tracker", LEAVE_TRACKER_PATH.slice(1), "Set allowances and see days used"]);
-    links.push(["Sick Days Tracker", SICK_TRACKER_PATH.slice(1), "Set allowances and see sick days used"]);
+    masterLinks.push(["Annual Leave", ANNUAL_LEAVE_FILE, "Everyone's annual leave, all teams, in one view"]);
+    trackerLinks.push(["Annual Leave Tracker", LEAVE_TRACKER_PATH.slice(1), "Set allowances and see days used"]);
+    trackerLinks.push(["Sick Days Tracker", SICK_TRACKER_PATH.slice(1), "Set allowances and see sick days used"]);
   }
 
   if (entry === "ALL") {
-    links.push(["All Teams (Master)", MASTER_FILE, "Everyone, every team, in one grid"]);
+    masterLinks.unshift(["All Teams (Master)", MASTER_FILE, "Everyone, every team, in one grid"]);
     for (const [team, file] of Object.entries(TEAM_PAGES)) {
-      links.push([team, file, `${team} team schedule`]);
+      teamLinks.push([team, file, `${team} team schedule`]);
     }
   } else if (Array.isArray(entry)) {
     for (const team of entry) {
       if (TEAM_PAGES[team]) {
-        links.push([team, TEAM_PAGES[team], `${team} team schedule`]);
+        teamLinks.push([team, TEAM_PAGES[team], `${team} team schedule`]);
       }
     }
   }
 
-  const itemsHtml = links.length
-    ? links
-        .map(
-          ([label, file, desc]) => `<li><a href="${file}">
-            <span class="tri"></span>
-            <span class="link-text">
-              <span class="link-label">${escapeHtml(label)}</span>
-              <span class="link-desc">${escapeHtml(desc)}</span>
-            </span>
-          </a></li>`
-        )
-        .join("")
-    : `<li><div class="empty">No schedules are assigned to your account yet.<br>If this looks wrong, check with Iestyn.</div></li>`;
+  function renderLinkGroup(title, groupLinks) {
+    if (!groupLinks.length) return "";
+    const itemsHtml = groupLinks
+      .map(
+        ([label, file, desc]) => `<li><a href="${file}">
+          <span class="tri"></span>
+          <span class="link-text">
+            <span class="link-label">${escapeHtml(label)}</span>
+            <span class="link-desc">${escapeHtml(desc)}</span>
+          </span>
+        </a></li>`
+      )
+      .join("");
+    return `<div class="link-group">
+      <h2 class="group-title">${escapeHtml(title)}</h2>
+      <ul class="links">${itemsHtml}</ul>
+    </div>`;
+  }
+
+  const allEmpty = !myScheduleLinks.length && !masterLinks.length && !trackerLinks.length && !teamLinks.length;
+  const itemsHtml = allEmpty
+    ? `<div class="empty">No schedules are assigned to your account yet.<br>If this looks wrong, check with Iestyn.</div>`
+    : renderLinkGroup("My Schedule", myScheduleLinks) +
+      renderLinkGroup("Master Schedule", masterLinks) +
+      renderLinkGroup("Trackers", trackerLinks) +
+      renderLinkGroup("Team Schedules", teamLinks);
 
   const statusHtml = syncedAt
     ? `<div class="status"><span class="dot" id="syncDot"></span>synced <span id="syncedTimeText">${escapeHtml(syncedAt)}</span></div>`
@@ -501,7 +529,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
     ${statusHtml}
     ${syncErrorHtml}
     ${widgetsHtml}
-    <ul class="links">${itemsHtml}</ul>
+    ${itemsHtml}
   </div>
   ${weatherScript}
 </body>
