@@ -464,7 +464,7 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
 
       return `<tr data-person="${escapeHtml(name)}">
         <td class="name-cell">${escapeHtml(name)}</td>
-        <td><input type="number" class="allowance-input" min="0" step="1" value="${allowance}"></td>
+        <td><input type="number" class="allowance-input" min="0" step="0.5" value="${allowance}"></td>
         <td>${used}</td>
         <td class="${remainingClass}">${remaining}</td>
         <td><input type="date" class="reset-input" value="${escapeHtml(resetDate)}"></td>
@@ -622,7 +622,7 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
       const data = {};
       document.querySelectorAll('tr[data-person]').forEach(function (row) {
         const person = row.getAttribute('data-person');
-        const allowance = parseInt(row.querySelector('.allowance-input').value, 10) || 0;
+        const allowance = parseFloat(row.querySelector('.allowance-input').value) || 0;
         const resetDate = row.querySelector('.reset-input').value || '';
         data[person] = { allowance: allowance, resetDate: resetDate };
       });
