@@ -328,6 +328,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
   if (email && ANNUAL_LEAVE_VIEWERS.has(email)) {
     links.push(["Annual Leave", ANNUAL_LEAVE_FILE, "Everyone's annual leave, all teams, in one view"]);
     links.push(["Annual Leave Tracker", LEAVE_TRACKER_PATH.slice(1), "Set allowances and see days used"]);
+    links.push(["Sick Days Tracker", SICK_TRACKER_PATH.slice(1), "Set allowances and see sick days used"]);
   }
 
   if (entry === "ALL") {
@@ -637,6 +638,11 @@ const LEAVE_KV_KEY = "leave-allowances";
 const LEAVE_LOG_KEY = "leave-changelog";
 const DEFAULT_ALLOWANCE = 25;
 
+const SICK_TRACKER_PATH = "/sick-tracker";
+const SICK_KV_KEY = "sick-allowances";
+const SICK_LOG_KEY = "sick-changelog";
+const DEFAULT_SICK_ALLOWANCE = 10;
+
 // Given a stored reset date (any year - only the month/day matter, since
 // this repeats annually) and today's date, works out the most recent
 // occurrence of that anniversary on or before today.
@@ -668,6 +674,17 @@ function countUsedALDays(personName, rows, sinceISODate) {
     if (!r.start_date || r.start_date < sinceISODate) continue;
     if (r.status === "A/L") total += 1;
     else if (r.status === "A/L (Half Day)") total += 0.5;
+  }
+  return total;
+}
+
+function countUsedSickDays(personName, rows, sinceISODate) {
+  if (!sinceISODate) return 0;
+  let total = 0;
+  for (const r of rows) {
+    if (!Array.isArray(r.people) || !r.people.includes(personName)) continue;
+    if (!r.start_date || r.start_date < sinceISODate) continue;
+    if (r.status === "Sick") total += 1;
   }
   return total;
 }
@@ -836,6 +853,217 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Annual Leave Tracker</h1>
   <div class="meta">Allowance and reset dates are editable here directly. "Used" counts A/L days since each person's most recent reset date.</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Person</th>
+          <th>Allowance (days)</th>
+          <th>Used</th>
+          <th>Remaining</th>
+          <th>Resets on</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  </div>
+  <div class="save-bar">
+    <button class="save-btn" id="saveBtn">Save Changes</button>
+    <span id="saveStatus" style="font-size:13px;color:#666;"></span>
+  </div>
+
+  <div class="log-toggle-wrap">
+    <button type="button" class="log-toggle" id="logToggle">&darr; View change log</button>
+  </div>
+  <div class="log-panel" id="logPanel">${logHtml}</div>
+
+  <script>
+    document.getElementById('saveBtn').addEventListener('click', async function () {
+      const btn = this;
+      const status = document.getElementById('saveStatus');
+      btn.disabled = true;
+      status.textContent = 'Saving...';
+
+      const data = {};
+      document.querySelectorAll('tr[data-person]').forEach(function (row) {
+        const person = row.getAttribute('data-person');
+        const allowance = parseFloat(row.querySelector('.allowance-input').value) || 0;
+        const resetDate = row.querySelector('.reset-input').value || '';
+        data[person] = { allowance: allowance, resetDate: resetDate };
+      });
+
+      try {
+        const resp = await fetch(window.location.pathname, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (resp.ok) {
+          status.textContent = 'Saved - reloading...';
+          setTimeout(function () { window.location.reload(); }, 600);
+        } else {
+          status.textContent = 'Save failed - try again.';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        status.textContent = 'Save failed - check your connection.';
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('logToggle').addEventListener('click', function () {
+      const panel = document.getElementById('logPanel');
+      const expanded = panel.classList.toggle('visible');
+      this.textContent = expanded ? '\u2191 Hide change log' : '\u2193 View change log';
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function renderSickTracker(sickData, rows, changeLog) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const people = Object.values(EMAIL_TO_NAME).sort();
+
+  const rowsHtml = people
+    .map((name) => {
+      const saved = sickData[name] || {};
+      const allowance = typeof saved.allowance === "number" ? saved.allowance : DEFAULT_SICK_ALLOWANCE;
+      const resetDate = saved.resetDate || "";
+      const mostRecent = mostRecentResetDate(resetDate, today);
+      const sinceISO = mostRecent ? toISODateString(mostRecent) : null;
+      const used = countUsedSickDays(name, rows, sinceISO);
+      const remaining = allowance - used;
+      const remainingClass = remaining < 0 ? "over" : remaining <= 2 ? "low" : "";
+
+      return `<tr data-person="${escapeHtml(name)}">
+        <td class="name-cell">${escapeHtml(name)}</td>
+        <td><input type="number" class="allowance-input" min="0" step="0.5" value="${allowance}"></td>
+        <td>${used}</td>
+        <td class="${remainingClass}">${remaining}</td>
+        <td><input type="date" class="reset-input" value="${escapeHtml(resetDate)}"></td>
+        <td class="reset-note">${sinceISO ? `since ${sinceISO}` : "no reset date set"}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const logHtml = (changeLog || []).length
+    ? (changeLog || [])
+        .map(
+          (entry) => `<div class="log-entry">
+            <span class="log-time">${escapeHtml(formatLogTime(entry.time))}</span>
+            <span class="log-by">${escapeHtml(entry.by)}</span>
+            <span class="log-desc">${escapeHtml(entry.person)}: ${escapeHtml(entry.summary)}</span>
+          </div>`
+        )
+        .join("")
+    : `<div class="log-empty">No changes logged yet.</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sick Days Tracker</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #fafafa;
+    color: #1a1a1a;
+  }
+  a.back {
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #333;
+    text-decoration: none;
+  }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: #666; margin-bottom: 16px; }
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+  }
+  table { border-collapse: collapse; min-width: 100%; }
+  th, td {
+    border: 1px solid #e0e0e0;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  thead th {
+    background: #333;
+    color: #fff;
+  }
+  .name-cell { font-weight: 600; }
+  input.allowance-input { width: 60px; padding: 4px; font-size: 13px; }
+  input.reset-input { padding: 4px; font-size: 13px; }
+  .reset-note { color: #888; font-size: 12px; }
+  td.over { color: #c0392b; font-weight: 700; }
+  td.low { color: #d18a1f; font-weight: 700; }
+  .save-bar { margin-top: 16px; display: flex; align-items: center; gap: 12px; }
+  button.save-btn {
+    background: #3f7fd1;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.save-btn:hover { background: #2f6bb8; }
+  button.save-btn:disabled { background: #999; cursor: default; }
+  .save-message { font-size: 13px; color: #2a7a2a; }
+  .log-toggle-wrap { margin-top: 24px; }
+  .log-toggle {
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: #333;
+  }
+  .log-toggle:hover { background: #f0f0f0; }
+  .log-panel {
+    display: none;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .log-panel.visible { display: block; }
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { color: #888; min-width: 140px; }
+  .log-by { font-weight: 600; min-width: 110px; }
+  .log-desc { color: #333; }
+  .log-empty { padding: 14px; color: #888; font-size: 13px; }
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Sick Days Tracker</h1>
+  <div class="meta">Allowance and reset dates are editable here directly. "Used" counts Sick days since each person's most recent reset date.</div>
   <div class="table-wrap">
     <table>
       <thead>
@@ -1105,6 +1333,117 @@ export default {
       }
 
       return new Response(renderLeaveTracker(leaveData, rows, changeLog), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === SICK_TRACKER_PATH) {
+      const email = decodeAccessEmail(request);
+
+      if (!email || !ANNUAL_LEAVE_VIEWERS.has(email)) {
+        return new Response("Not authorised.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      if (!env.LEAVE_KV) {
+        return new Response(
+          "Leave data storage isn't set up yet (missing LEAVE_KV binding). Check wrangler.jsonc and the Cloudflare KV namespace setup.",
+          { status: 500, headers: { "content-type": "text/plain; charset=UTF-8" } }
+        );
+      }
+
+      if (request.method === "POST") {
+        let incoming;
+        try {
+          incoming = await request.json();
+        } catch (err) {
+          return new Response("Invalid data.", { status: 400 });
+        }
+
+        const clean = {};
+        for (const [name, val] of Object.entries(incoming || {})) {
+          if (typeof name !== "string") continue;
+          const allowance = Number(val && val.allowance);
+          const resetDate = typeof (val && val.resetDate) === "string" ? val.resetDate : "";
+          if (!Number.isFinite(allowance) || allowance < 0) continue;
+          clean[name] = { allowance, resetDate };
+        }
+
+        let previous = {};
+        try {
+          const stored = await env.LEAVE_KV.get(SICK_KV_KEY);
+          if (stored) previous = JSON.parse(stored);
+        } catch (err) {
+          console.error("Failed to read previous sick data for diffing:", err);
+        }
+
+        const changedBy = EMAIL_TO_NAME[email] || email;
+        const nowISO = new Date().toISOString();
+        const newLogEntries = [];
+
+        for (const [name, val] of Object.entries(clean)) {
+          const before = previous[name];
+          if (!before) {
+            newLogEntries.push({
+              time: nowISO, by: changedBy, person: name,
+              summary: `Added, allowance ${val.allowance}${val.resetDate ? `, resets ${val.resetDate}` : ""}`,
+            });
+            continue;
+          }
+          if (before.allowance !== val.allowance) {
+            newLogEntries.push({
+              time: nowISO, by: changedBy, person: name,
+              summary: `Allowance changed: ${before.allowance} \u2192 ${val.allowance}`,
+            });
+          }
+          if ((before.resetDate || "") !== (val.resetDate || "")) {
+            newLogEntries.push({
+              time: nowISO, by: changedBy, person: name,
+              summary: `Reset date changed: ${before.resetDate || "(none)"} \u2192 ${val.resetDate || "(none)"}`,
+            });
+          }
+        }
+
+        if (newLogEntries.length > 0) {
+          let log = [];
+          try {
+            const storedLog = await env.LEAVE_KV.get(SICK_LOG_KEY);
+            if (storedLog) log = JSON.parse(storedLog);
+          } catch (err) {
+            console.error("Failed to read existing sick change log:", err);
+          }
+          log = [...newLogEntries.reverse(), ...log].slice(0, 300);
+          await env.LEAVE_KV.put(SICK_LOG_KEY, JSON.stringify(log));
+        }
+
+        await env.LEAVE_KV.put(SICK_KV_KEY, JSON.stringify(clean));
+        return new Response(JSON.stringify({ ok: true, changes: newLogEntries.length }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      let sickData = {};
+      let sickChangeLog = [];
+      try {
+        const stored = await env.LEAVE_KV.get(SICK_KV_KEY);
+        if (stored) sickData = JSON.parse(stored);
+        const storedLog = await env.LEAVE_KV.get(SICK_LOG_KEY);
+        if (storedLog) sickChangeLog = JSON.parse(storedLog);
+      } catch (err) {
+        console.error("Failed to read sick data from KV:", err);
+      }
+
+      let sickRows = [];
+      try {
+        const dataResp = await env.ASSETS.fetch(new URL("/schedule-data.json", request.url));
+        if (dataResp.ok) sickRows = await dataResp.json();
+      } catch (err) {
+        console.error("Failed to load schedule data for sick tracker:", err);
+      }
+
+      return new Response(renderSickTracker(sickData, sickRows, sickChangeLog), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
