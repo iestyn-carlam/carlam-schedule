@@ -170,11 +170,13 @@ const PAGE_STYLE = `
     border-radius: 8px;
   }
   .widgets {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
+    display: flex;
+    justify-content: center;
     margin-bottom: 32px;
-    align-items: start;
+  }
+  .widgets .widget {
+    width: 100%;
+    max-width: 320px;
   }
   .widget {
     background: var(--surface);
@@ -276,6 +278,7 @@ const PAGE_STYLE = `
     align-items: center;
     gap: 12px;
     padding: 16px 18px;
+    min-height: 76px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -378,10 +381,6 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
     <div class="widget">
       <div class="widget-label">Weather</div>
       <div class="widget-body" id="weatherBody">Checking your location&hellip;</div>
-    </div>
-    <div class="widget">
-      <div class="widget-label"><span class="bbc-badge">BBC</span> UK Headlines</div>
-      <ul class="headlines">${headlinesHtml}</ul>
     </div>
   </div>`;
 
@@ -952,22 +951,7 @@ export default {
         // If this fails for any reason, the page still renders fine without it.
       }
 
-      let headlines = [];
-      try {
-        const newsController = new AbortController();
-        const newsTimeout = setTimeout(() => newsController.abort(), 3000);
-        const newsResp = await fetch("https://feeds.bbci.co.uk/news/uk/rss.xml", {
-          signal: newsController.signal,
-        });
-        clearTimeout(newsTimeout);
-        if (newsResp.ok) {
-          const xmlText = await newsResp.text();
-          headlines = parseRssHeadlines(xmlText, 2);
-        }
-      } catch (err) {
-        // Headlines are a nice-to-have - if BBC is slow or unreachable, the
-        // homepage still renders fine without them.
-      }
+      const headlines = [];
 
       return new Response(renderIndex(email, syncedAt, headlines, syncedAtIso), {
         headers: { "content-type": "text/html; charset=UTF-8" },
