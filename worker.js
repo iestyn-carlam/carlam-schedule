@@ -174,6 +174,7 @@ const PAGE_STYLE = `
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 12px;
     margin-bottom: 32px;
+    align-items: start;
   }
   .widget {
     background: var(--surface);
@@ -230,8 +231,6 @@ const PAGE_STYLE = `
     display: flex;
     flex-direction: column;
     gap: 14px;
-    max-height: 210px;
-    overflow-y: auto;
   }
   .headline-item {
     display: flex;
@@ -963,7 +962,7 @@ export default {
         clearTimeout(newsTimeout);
         if (newsResp.ok) {
           const xmlText = await newsResp.text();
-          headlines = parseRssHeadlines(xmlText, 5);
+          headlines = parseRssHeadlines(xmlText, 2);
         }
       } catch (err) {
         // Headlines are a nice-to-have - if BBC is slow or unreachable, the
