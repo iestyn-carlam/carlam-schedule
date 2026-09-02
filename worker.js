@@ -116,7 +116,7 @@ const PAGE_STYLE = `
     justify-content: center;
     padding: 48px 20px 64px;
   }
-  .page { width: 100%; max-width: 440px; }
+  .page { width: 100%; max-width: 780px; }
   .logo-wrap { text-align: center; margin-bottom: 28px; }
   .logo-wrap img { width: 120px; height: auto; display: inline-block; }
   h1 {
@@ -155,8 +155,15 @@ const PAGE_STYLE = `
     70%  { box-shadow: 0 0 0 7px rgba(63, 127, 209, 0); }
     100% { box-shadow: 0 0 0 0 rgba(63, 127, 209, 0); }
   }
-  ul.links { list-style: none; margin: 0; padding: 0; }
-  ul.links li { margin-bottom: 10px; }
+  ul.links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  ul.links li { margin-bottom: 0; }
   ul.links a {
     display: flex;
     align-items: center;
