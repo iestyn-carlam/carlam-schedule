@@ -543,34 +543,44 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
     .filter((r) => r.start_date && Array.isArray(r.people) && r.people.includes(personName))
     .sort((a, b) => (a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : 0));
 
+  function renderEntry(r) {
+    const d = new Date(r.start_date + "T00:00:00");
+    const isToday = d.getTime() === today.getTime();
+    const isPast = d.getTime() < today.getTime();
+    const dateLabel = d.toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: d.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+    });
+    const parts = [r.programme, r.status, r.title].filter(Boolean);
+    const line = escapeHtml(parts.join(" - ") || "Untitled");
+    const colour = entryColour(r.status, r.programme);
+    const rowClass = isToday ? "today" : isPast ? "past" : "";
+    return `<div class="entry ${rowClass}">
+      <div class="entry-date">${escapeHtml(dateLabel)}</div>
+      <div class="entry-body" style="background:${colour}">
+        <div class="entry-line">${line}</div>
+        ${r.notes ? `<div class="entry-notes">${escapeHtml(r.notes)}</div>` : ""}
+      </div>
+    </div>`;
+  }
+
+  const pastRows = myRows.filter((r) => r.start_date < today.toISOString().slice(0, 10));
+  const currentRows = myRows.filter((r) => r.start_date >= today.toISOString().slice(0, 10));
+
   let itemsHtml;
   if (myRows.length === 0) {
     itemsHtml = `<div class="empty">Nothing tagged to you yet. If this looks wrong, check with Iestyn.</div>`;
   } else {
-    itemsHtml = myRows
-      .map((r) => {
-        const d = new Date(r.start_date + "T00:00:00");
-        const isToday = d.getTime() === today.getTime();
-        const isPast = d.getTime() < today.getTime();
-        const dateLabel = d.toLocaleDateString("en-GB", {
-          weekday: "short",
-          day: "2-digit",
-          month: "short",
-          year: d.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
-        });
-        const parts = [r.programme, r.status, r.title].filter(Boolean);
-        const line = escapeHtml(parts.join(" - ") || "Untitled");
-        const colour = entryColour(r.status, r.programme);
-        const rowClass = isToday ? "today" : isPast ? "past" : "";
-        return `<div class="entry ${rowClass}">
-          <div class="entry-date">${escapeHtml(dateLabel)}</div>
-          <div class="entry-body" style="background:${colour}">
-            <div class="entry-line">${line}</div>
-            ${r.notes ? `<div class="entry-notes">${escapeHtml(r.notes)}</div>` : ""}
-          </div>
-        </div>`;
-      })
-      .join("");
+    const pastToggleHtml = pastRows.length
+      ? `<button type="button" class="past-toggle" id="pastToggle">&darr; Show earlier (${pastRows.length})</button>
+         <div class="past-entries" id="pastEntries">${pastRows.map(renderEntry).join("")}</div>`
+      : "";
+    const currentHtml = currentRows.length
+      ? currentRows.map(renderEntry).join("")
+      : `<div class="empty">Nothing upcoming right now.</div>`;
+    itemsHtml = `${pastToggleHtml}${currentHtml}`;
   }
 
   const generatedAt = syncedAt ? escapeHtml(syncedAt) : "";
@@ -614,6 +624,22 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
   .entry.today .entry-body { border: 2px solid #3f7fd1; }
   .entry.past { opacity: 0.55; }
   .empty { color: #666; font-size: 14px; padding: 16px; background: #fff; border: 1px solid #ddd; border-radius: 8px; }
+  .past-toggle {
+    display: block;
+    width: 100%;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin-bottom: 14px;
+    cursor: pointer;
+    color: #333;
+  }
+  .past-toggle:hover { background: #f0f0f0; }
+  .past-entries { display: none; margin-bottom: 14px; }
+  .past-entries.visible { display: block; }
 </style>
 </head>
 <body>
@@ -621,6 +647,18 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
   <h1>My Schedule</h1>
   <div class="meta">${escapeHtml(personName)} &middot; synced ${generatedAt} &middot; refreshes automatically every 2 minutes</div>
   ${itemsHtml}
+  <script>
+    (function () {
+      var btn = document.getElementById('pastToggle');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        var panel = document.getElementById('pastEntries');
+        var expanded = panel.classList.toggle('visible');
+        var count = panel.children.length;
+        this.textContent = expanded ? '\u2191 Hide earlier' : '\u2193 Show earlier (' + count + ')';
+      });
+    })();
+  </script>
 </body>
 </html>`;
 }
