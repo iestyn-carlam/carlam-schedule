@@ -361,7 +361,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
     ? `<div class="status"><span class="dot" id="syncDot"></span>synced <span id="syncedTimeText">${escapeHtml(syncedAt)}</span></div>`
     : `<div class="status"><span class="dot" id="syncDot"></span>live</div>`;
 
-  const syncErrorHtml = `<div class="sync-error" id="syncError">There's a sync issue &mdash; contact the admin (Iestyn).</div>`;
+  const syncErrorHtml = `<div class="sync-error" id="syncError">Hasn't updated in a while &mdash; try refreshing the page. Still stale after that? Contact the admin (Iestyn).</div>`;
 
   const headlinesHtml = (headlines && headlines.length)
     ? headlines
