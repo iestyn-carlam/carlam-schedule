@@ -1471,7 +1471,7 @@ function parseRssHeadlines(xmlText, limit) {
 const REQUEST_KV_KEY = "leave-requests";
 const NOTION_DATABASE_ID = "cb3f71d4936942aeba976fd6a3b17e8a";
 const MAIL_FROM = "system@carlamltd.com";
-const APPROVER_EMAILS = ["eurosllyr@carlamltd.com", "derwena@carlamltd.com"];
+const APPROVER_EMAILS = ["eurosllyr@carlamltd.com"];
 
 function generateRequestId() {
   return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
