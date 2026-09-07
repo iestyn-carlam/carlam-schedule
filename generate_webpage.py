@@ -391,6 +391,98 @@ THEME_PICKER_SCRIPT = """<script>
 })();
 </script>"""
 
+# --- User badge (top-left, on every page) -----------------------------------
+# Shows the logged-in person's name with a dropdown to log out of Cloudflare
+# Access. Fetched client-side from a /whoami endpoint on the Worker, so this
+# works correctly on these static Python-generated pages too, even though
+# they don't know who's viewing them at build time.
+USER_BADGE_CSS = """
+  .user-badge-fixed {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+  }
+  .user-badge-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 12px 6px 10px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .user-badge-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .user-badge-panel {
+    position: absolute;
+    top: 42px;
+    left: 0;
+    display: none;
+    min-width: 140px;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  }
+  .user-badge-panel.open { display: block; }
+  .user-badge-panel a {
+    display: block;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 6px;
+  }
+  .user-badge-panel a:hover { background: var(--surface-hover); }
+"""
+
+USER_BADGE_HTML = """<div class="user-badge-fixed" style="position:relative;">
+  <button class="user-badge-btn" id="userBadgeBtn"><span class="user-badge-dot"></span><span id="userBadgeName">&hellip;</span></button>
+  <div class="user-badge-panel" id="userBadgePanel">
+    <a href="https://iestyn-041.cloudflareaccess.com/cdn-cgi/access/logout">Log out</a>
+  </div>
+</div>"""
+
+USER_BADGE_SCRIPT = """<script>
+(function () {
+  var btn = document.getElementById('userBadgeBtn');
+  var nameEl = document.getElementById('userBadgeName');
+  var panel = document.getElementById('userBadgePanel');
+  if (!btn || !nameEl || !panel) return;
+
+  fetch('/whoami')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      nameEl.textContent = data.name || 'Not signed in';
+    })
+    .catch(function () {
+      nameEl.textContent = 'Not signed in';
+    });
+
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    panel.classList.toggle('open');
+  });
+  document.addEventListener('click', function (e) {
+    if (panel.classList.contains('open') && !panel.contains(e.target) && e.target !== btn) {
+      panel.classList.remove('open');
+    }
+  });
+})();
+</script>"""
+
 PAGE_STYLE = """
   body {
     height: 100vh;
@@ -696,16 +788,18 @@ def build_html(rows, page_title, back_link=None) -> str:
 <meta http-equiv="refresh" content="{AUTO_REFRESH_SECONDS}">
 {THEME_BOOTSTRAP_SCRIPT}
 <title>{html.escape(page_title)}</title>
-<style>{THEME_VARS_CSS}{THEME_PICKER_CSS}{PAGE_STYLE}</style>
+<style>{THEME_VARS_CSS}{THEME_PICKER_CSS}{USER_BADGE_CSS}{PAGE_STYLE}</style>
 </head>
 <body>
   {THEME_PICKER_HTML}
+  {USER_BADGE_HTML}
   {back_html}
   <h1>{html.escape(page_title)}</h1>
   <div class="meta">Last updated {generated_at} &middot; refreshes automatically every {AUTO_REFRESH_SECONDS // 60} minutes &middot; keep this tab open for a live view</div>
   {table_html}
   {scroll_hint_script if people else ""}
   {THEME_PICKER_SCRIPT}
+  {USER_BADGE_SCRIPT}
 </body>
 </html>
 """
