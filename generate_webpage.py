@@ -302,7 +302,37 @@ THEME_BOOTSTRAP_SCRIPT = """<script>
 </script>"""
 
 THEME_PICKER_CSS = """
-  .theme-picker { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 200px; }
+  .theme-picker-fixed {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+  }
+  .theme-toggle-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--accent);
+    cursor: pointer;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  .theme-panel {
+    position: absolute;
+    top: 42px;
+    right: 0;
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 128px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  }
+  .theme-panel.open { display: flex; }
   .theme-swatch {
     width: 20px;
     height: 20px;
@@ -325,21 +355,38 @@ THEME_PICKER_CSS = """
   .theme-swatch.active { border-color: #fff; box-shadow: 0 0 0 1px var(--accent); }
 """
 
-THEME_PICKER_HTML = """<div class="theme-picker" title="Theme">
-  <button class="theme-swatch" data-theme-btn="dark" aria-label="Dark theme"></button>
-  <button class="theme-swatch" data-theme-btn="light" aria-label="Light theme"></button>
-  <button class="theme-swatch" data-theme-btn="midnight" aria-label="Midnight theme"></button>
-  <button class="theme-swatch" data-theme-btn="pink" aria-label="Pink theme"></button>
-  <button class="theme-swatch" data-theme-btn="red" aria-label="Red theme"></button>
-  <button class="theme-swatch" data-theme-btn="green" aria-label="Green theme"></button>
-  <button class="theme-swatch" data-theme-btn="blue" aria-label="Blue theme"></button>
-  <button class="theme-swatch" data-theme-btn="purple" aria-label="Purple theme"></button>
-  <button class="theme-swatch" data-theme-btn="orange" aria-label="Orange theme"></button>
-  <button class="theme-swatch" data-theme-btn="light-blue" aria-label="Light blue theme"></button>
+THEME_PICKER_HTML = """<div class="theme-picker-fixed">
+  <button class="theme-toggle-btn" id="themeToggleBtn" aria-label="Choose theme" title="Theme"></button>
+  <div class="theme-panel" id="themePanel">
+    <button class="theme-swatch" data-theme-btn="dark" aria-label="Dark theme"></button>
+    <button class="theme-swatch" data-theme-btn="light" aria-label="Light theme"></button>
+    <button class="theme-swatch" data-theme-btn="midnight" aria-label="Midnight theme"></button>
+    <button class="theme-swatch" data-theme-btn="pink" aria-label="Pink theme"></button>
+    <button class="theme-swatch" data-theme-btn="red" aria-label="Red theme"></button>
+    <button class="theme-swatch" data-theme-btn="green" aria-label="Green theme"></button>
+    <button class="theme-swatch" data-theme-btn="blue" aria-label="Blue theme"></button>
+    <button class="theme-swatch" data-theme-btn="purple" aria-label="Purple theme"></button>
+    <button class="theme-swatch" data-theme-btn="orange" aria-label="Orange theme"></button>
+    <button class="theme-swatch" data-theme-btn="light-blue" aria-label="Light blue theme"></button>
+  </div>
 </div>"""
 
 THEME_PICKER_SCRIPT = """<script>
 (function () {
+  var toggleBtn = document.getElementById('themeToggleBtn');
+  var panel = document.getElementById('themePanel');
+  if (!toggleBtn || !panel) return;
+
+  toggleBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    panel.classList.toggle('open');
+  });
+  document.addEventListener('click', function (e) {
+    if (panel.classList.contains('open') && !panel.contains(e.target) && e.target !== toggleBtn) {
+      panel.classList.remove('open');
+    }
+  });
+
   var current = document.documentElement.getAttribute('data-theme') || 'dark';
   document.querySelectorAll('.theme-swatch').forEach(function (btn) {
     if (btn.getAttribute('data-theme-btn') === current) btn.classList.add('active');
@@ -660,10 +707,8 @@ def build_html(rows, page_title, back_link=None) -> str:
 <style>{THEME_VARS_CSS}{THEME_PICKER_CSS}{PAGE_STYLE}</style>
 </head>
 <body>
-  <div class="top-row">
-    {back_html}
-    {THEME_PICKER_HTML}
-  </div>
+  {THEME_PICKER_HTML}
+  {back_html}
   <h1>{html.escape(page_title)}</h1>
   <div class="meta">Last updated {generated_at} &middot; refreshes automatically every {AUTO_REFRESH_SECONDS // 60} minutes &middot; keep this tab open for a live view</div>
   {table_html}
