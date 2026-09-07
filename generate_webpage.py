@@ -788,18 +788,16 @@ def build_html(rows, page_title, back_link=None) -> str:
 <meta http-equiv="refresh" content="{AUTO_REFRESH_SECONDS}">
 {THEME_BOOTSTRAP_SCRIPT}
 <title>{html.escape(page_title)}</title>
-<style>{THEME_VARS_CSS}{THEME_PICKER_CSS}{USER_BADGE_CSS}{PAGE_STYLE}</style>
+<style>{THEME_VARS_CSS}{THEME_PICKER_CSS}{PAGE_STYLE}</style>
 </head>
 <body>
   {THEME_PICKER_HTML}
-  {USER_BADGE_HTML}
   {back_html}
   <h1>{html.escape(page_title)}</h1>
   <div class="meta">Last updated {generated_at} &middot; refreshes automatically every {AUTO_REFRESH_SECONDS // 60} minutes &middot; keep this tab open for a live view</div>
   {table_html}
   {scroll_hint_script if people else ""}
   {THEME_PICKER_SCRIPT}
-  {USER_BADGE_SCRIPT}
 </body>
 </html>
 """
