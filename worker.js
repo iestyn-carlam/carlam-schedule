@@ -358,7 +358,7 @@ const USER_BADGE_CSS = `
   .user-badge-panel a:hover { background: var(--surface-hover); }
 `;
 
-const USER_BADGE_HTML = `<div class="user-badge-fixed" style="position:relative;">
+const USER_BADGE_HTML = `<div class="user-badge-fixed">
   <button class="user-badge-btn" id="userBadgeBtn"><span class="user-badge-dot"></span><span id="userBadgeName">&hellip;</span></button>
   <div class="user-badge-panel" id="userBadgePanel">
     <a href="https://${CF_TEAM_DOMAIN}/cdn-cgi/access/logout">Log out</a>
@@ -929,7 +929,7 @@ ${THEME_BOOTSTRAP_SCRIPT}
 <title>My Schedule - ${escapeHtml(personName)}</title>
 <style>
 ${THEME_VARS_CSS}
-${THEME_PICKER_CSS}${USER_BADGE_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
@@ -981,13 +981,11 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
 </head>
 <body>
   ${THEME_PICKER_HTML}
-  ${USER_BADGE_HTML}
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>My Schedule</h1>
   <div class="meta">${escapeHtml(personName)} &middot; synced ${generatedAt} &middot; refreshes automatically every 2 minutes</div>
   ${itemsHtml}
   ${THEME_PICKER_SCRIPT}
-  ${USER_BADGE_SCRIPT}
   <script>
     (function () {
       var btn = document.getElementById('pastToggle');
@@ -1142,7 +1140,7 @@ ${THEME_BOOTSTRAP_SCRIPT}
 <title>Annual Leave Tracker</title>
 <style>
 ${THEME_VARS_CSS}
-${THEME_PICKER_CSS}${USER_BADGE_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
@@ -1237,7 +1235,6 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
 </head>
 <body>
   ${THEME_PICKER_HTML}
-  ${USER_BADGE_HTML}
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Annual Leave Tracker</h1>
   <div class="meta">Allowance and reset dates are editable here directly. "Used" counts A/L days since each person's most recent reset date.</div>
@@ -1307,7 +1304,6 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
     });
   </script>
   ${THEME_PICKER_SCRIPT}
-  ${USER_BADGE_SCRIPT}
 </body>
 </html>`;
 }
@@ -1361,7 +1357,7 @@ ${THEME_BOOTSTRAP_SCRIPT}
 <title>Sick Days Tracker</title>
 <style>
 ${THEME_VARS_CSS}
-${THEME_PICKER_CSS}${USER_BADGE_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
@@ -1456,7 +1452,6 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
 </head>
 <body>
   ${THEME_PICKER_HTML}
-  ${USER_BADGE_HTML}
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Sick Days Tracker</h1>
   <div class="meta">Allowance and reset dates are editable here directly. "Used" counts Sick days since each person's most recent reset date.</div>
@@ -1526,7 +1521,6 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
     });
   </script>
   ${THEME_PICKER_SCRIPT}
-  ${USER_BADGE_SCRIPT}
 </body>
 </html>`;
 }
@@ -1644,7 +1638,7 @@ ${THEME_BOOTSTRAP_SCRIPT}
 <title>Request Annual Leave</title>
 <style>
 ${THEME_VARS_CSS}
-${THEME_PICKER_CSS}${USER_BADGE_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
@@ -1692,7 +1686,6 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
 </head>
 <body>
   ${THEME_PICKER_HTML}
-  ${USER_BADGE_HTML}
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Request Annual Leave</h1>
   <div class="meta">Requesting as ${escapeHtml(personName)}</div>
@@ -1721,7 +1714,6 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
   </form>
 
   ${THEME_PICKER_SCRIPT}
-  ${USER_BADGE_SCRIPT}
   <script>
     (function () {
       var startInput = document.getElementById('startDate');
@@ -1892,7 +1884,7 @@ ${THEME_BOOTSTRAP_SCRIPT}
 <title>My Leave Requests</title>
 <style>
 ${THEME_VARS_CSS}
-${THEME_PICKER_CSS}${USER_BADGE_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
@@ -1926,13 +1918,11 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
 </head>
 <body>
   ${THEME_PICKER_HTML}
-  ${USER_BADGE_HTML}
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>My Leave Requests</h1>
   <div class="meta">${escapeHtml(personName)}</div>
   ${itemsHtml}
   ${THEME_PICKER_SCRIPT}
-  ${USER_BADGE_SCRIPT}
 </body>
 </html>`;
 }
@@ -1995,7 +1985,7 @@ ${THEME_BOOTSTRAP_SCRIPT}
 <title>Approve Leave Requests</title>
 <style>
 ${THEME_VARS_CSS}
-${THEME_PICKER_CSS}${USER_BADGE_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
@@ -2055,7 +2045,6 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
 </head>
 <body>
   ${THEME_PICKER_HTML}
-  ${USER_BADGE_HTML}
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Approve Leave Requests</h1>
   <div class="meta">Click a request to see full details and decide.</div>
@@ -2064,7 +2053,6 @@ ${THEME_PICKER_CSS}${USER_BADGE_CSS}
   <div class="decided-heading">Recent decisions</div>
   ${decidedHtml}
   ${THEME_PICKER_SCRIPT}
-  ${USER_BADGE_SCRIPT}
   <script>
     function toggleDetail(id) {
       document.getElementById('detail-' + id).classList.toggle('open');
