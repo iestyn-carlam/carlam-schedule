@@ -206,7 +206,37 @@ const THEME_BOOTSTRAP_SCRIPT = `<script>
 </script>`;
 
 const THEME_PICKER_CSS = `
-  .theme-picker { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 200px; }
+  .theme-picker-fixed {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+  }
+  .theme-toggle-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--accent);
+    cursor: pointer;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  .theme-panel {
+    position: absolute;
+    top: 42px;
+    right: 0;
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 128px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  }
+  .theme-panel.open { display: flex; }
   .theme-swatch {
     width: 20px;
     height: 20px;
@@ -229,21 +259,38 @@ const THEME_PICKER_CSS = `
   .theme-swatch.active { border-color: #fff; box-shadow: 0 0 0 1px var(--accent); }
 `;
 
-const THEME_PICKER_HTML = `<div class="theme-picker" title="Theme">
-  <button class="theme-swatch" data-theme-btn="dark" aria-label="Dark theme"></button>
-  <button class="theme-swatch" data-theme-btn="light" aria-label="Light theme"></button>
-  <button class="theme-swatch" data-theme-btn="midnight" aria-label="Midnight theme"></button>
-  <button class="theme-swatch" data-theme-btn="pink" aria-label="Pink theme"></button>
-  <button class="theme-swatch" data-theme-btn="red" aria-label="Red theme"></button>
-  <button class="theme-swatch" data-theme-btn="green" aria-label="Green theme"></button>
-  <button class="theme-swatch" data-theme-btn="blue" aria-label="Blue theme"></button>
-  <button class="theme-swatch" data-theme-btn="purple" aria-label="Purple theme"></button>
-  <button class="theme-swatch" data-theme-btn="orange" aria-label="Orange theme"></button>
-  <button class="theme-swatch" data-theme-btn="light-blue" aria-label="Light blue theme"></button>
+const THEME_PICKER_HTML = `<div class="theme-picker-fixed">
+  <button class="theme-toggle-btn" id="themeToggleBtn" aria-label="Choose theme" title="Theme"></button>
+  <div class="theme-panel" id="themePanel">
+    <button class="theme-swatch" data-theme-btn="dark" aria-label="Dark theme"></button>
+    <button class="theme-swatch" data-theme-btn="light" aria-label="Light theme"></button>
+    <button class="theme-swatch" data-theme-btn="midnight" aria-label="Midnight theme"></button>
+    <button class="theme-swatch" data-theme-btn="pink" aria-label="Pink theme"></button>
+    <button class="theme-swatch" data-theme-btn="red" aria-label="Red theme"></button>
+    <button class="theme-swatch" data-theme-btn="green" aria-label="Green theme"></button>
+    <button class="theme-swatch" data-theme-btn="blue" aria-label="Blue theme"></button>
+    <button class="theme-swatch" data-theme-btn="purple" aria-label="Purple theme"></button>
+    <button class="theme-swatch" data-theme-btn="orange" aria-label="Orange theme"></button>
+    <button class="theme-swatch" data-theme-btn="light-blue" aria-label="Light blue theme"></button>
+  </div>
 </div>`;
 
 const THEME_PICKER_SCRIPT = `<script>
 (function () {
+  var toggleBtn = document.getElementById('themeToggleBtn');
+  var panel = document.getElementById('themePanel');
+  if (!toggleBtn || !panel) return;
+
+  toggleBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    panel.classList.toggle('open');
+  });
+  document.addEventListener('click', function (e) {
+    if (panel.classList.contains('open') && !panel.contains(e.target) && e.target !== toggleBtn) {
+      panel.classList.remove('open');
+    }
+  });
+
   var current = document.documentElement.getAttribute('data-theme') || 'dark';
   document.querySelectorAll('.theme-swatch').forEach(function (btn) {
     if (btn.getAttribute('data-theme-btn') === current) btn.classList.add('active');
@@ -274,6 +321,13 @@ const PAGE_STYLE = `
   }
   .page { width: 100%; max-width: 780px; }
   .logo-wrap { text-align: center; margin-bottom: 36px; }
+  /* The logo asset is a white silhouette on transparent. For light-background
+     themes, inverting the colours turns it black - visible against a light
+     page - while transparent areas stay transparent (invert doesn't touch
+     alpha), so no second image file is needed. */
+  [data-theme="light"] .logo, [data-theme="light-blue"] .logo {
+    filter: invert(1);
+  }
   .logo-wrap img { width: 120px; height: auto; display: inline-block; }
   h1 {
     font-family: 'Space Grotesk', sans-serif;
@@ -678,9 +732,9 @@ ${THEME_BOOTSTRAP_SCRIPT}
 <style>${THEME_VARS_CSS}${THEME_PICKER_CSS}${PAGE_STYLE}</style>
 </head>
 <body>
+  ${THEME_PICKER_HTML}
   <div class="page">
-    <div class="logo-wrap"><img src="/carlam-logo.png" alt="Carlam"></div>
-    <div style="display:flex; justify-content:center; margin-bottom:20px;">${THEME_PICKER_HTML}</div>
+    <div class="logo-wrap"><img class="logo" src="/carlam-logo.png" alt="Carlam"></div>
     <h1>Schedules</h1>
     ${statusHtml}
     ${syncErrorHtml}
@@ -831,10 +885,8 @@ ${THEME_PICKER_CSS}
 </style>
 </head>
 <body>
-  <div class="top-row">
-    <a class="back" href="index.html">&larr; All schedules</a>
-    ${THEME_PICKER_HTML}
-  </div>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
   <h1>My Schedule</h1>
   <div class="meta">${escapeHtml(personName)} &middot; synced ${generatedAt} &middot; refreshes automatically every 2 minutes</div>
   ${itemsHtml}
@@ -1087,10 +1139,8 @@ ${THEME_PICKER_CSS}
 </style>
 </head>
 <body>
-  <div class="top-row">
-    <a class="back" href="index.html">&larr; All schedules</a>
-    ${THEME_PICKER_HTML}
-  </div>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Annual Leave Tracker</h1>
   <div class="meta">Allowance and reset dates are editable here directly. "Used" counts A/L days since each person's most recent reset date.</div>
   <div class="table-wrap">
@@ -1306,10 +1356,8 @@ ${THEME_PICKER_CSS}
 </style>
 </head>
 <body>
-  <div class="top-row">
-    <a class="back" href="index.html">&larr; All schedules</a>
-    ${THEME_PICKER_HTML}
-  </div>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Sick Days Tracker</h1>
   <div class="meta">Allowance and reset dates are editable here directly. "Used" counts Sick days since each person's most recent reset date.</div>
   <div class="table-wrap">
