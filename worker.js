@@ -546,12 +546,15 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
 
   if (email && EMAIL_TO_NAME[email]) {
     myScheduleLinks.push(["My Schedule", "my-schedule", "Just your own tasks, day by day"]);
+    myScheduleLinks.push(["Request Annual Leave", "request-leave", "Submit a new leave request"]);
+    myScheduleLinks.push(["My Leave Requests", "my-leave-requests", "Track the status of your requests"]);
   }
 
   if (email && ANNUAL_LEAVE_VIEWERS.has(email)) {
     masterLinks.push(["Annual Leave", ANNUAL_LEAVE_FILE, "Everyone's annual leave, all teams, in one view"]);
     trackerLinks.push(["Annual Leave Tracker", LEAVE_TRACKER_PATH.slice(1), "Set allowances and see days used"]);
     trackerLinks.push(["Sick Days Tracker", SICK_TRACKER_PATH.slice(1), "Set allowances and see sick days used"]);
+    trackerLinks.push(["Approve Leave Requests", "approve-leave", "Review and decide on pending requests"]);
   }
 
   if (entry === "ALL") {
@@ -1457,6 +1460,542 @@ function parseRssHeadlines(xmlText, limit) {
   return items;
 }
 
+// --- Annual Leave Requests --------------------------------------------
+// A full request -> approve/deny -> auto-create schedule rows workflow.
+// Requests are stored in the same LEAVE_KV namespace as the trackers.
+// Approving a request writes real rows into Notion directly via its REST
+// API (not through GitHub Actions), and both submission and decision
+// trigger a real email via Microsoft Graph, sent through the
+// system@carlamltd.com shared mailbox.
+
+const REQUEST_KV_KEY = "leave-requests";
+const NOTION_DATABASE_ID = "cb3f71d4936942aeba976fd6a3b17e8a";
+const MAIL_FROM = "system@carlamltd.com";
+const APPROVER_EMAILS = ["eurosllyr@carlamltd.com", "derwena@carlamltd.com"];
+
+function generateRequestId() {
+  return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+}
+
+// Expands a start/end date range into individual weekday dates (weekends
+// are skipped, since leave isn't normally booked against non-working
+// days), applying the half-day flag only to the first and/or last day.
+function expandLeaveDates(startDate, endDate, halfDayStart, halfDayEnd) {
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  const days = [];
+  let current = new Date(start);
+  while (current.getTime() <= end.getTime()) {
+    const dow = current.getDay();
+    if (dow !== 0 && dow !== 6) {
+      const iso = toISODateString(current);
+      const isFirst = iso === startDate;
+      const isLast = iso === endDate;
+      const isHalf = (isFirst && halfDayStart) || (isLast && halfDayEnd);
+      days.push({ date: iso, status: isHalf ? "A/L (Half Day)" : "A/L" });
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return days;
+}
+
+async function createNotionLeavePage(env, personName, dateStr, status) {
+  const resp = await fetch("https://api.notion.com/v1/pages", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.NOTION_TOKEN}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      parent: { database_id: NOTION_DATABASE_ID },
+      properties: {
+        Task: { title: [{ text: { content: "Annual Leave" } }] },
+        "Person Name": { select: { name: personName } },
+        Status: { select: { name: status } },
+        Date: { date: { start: dateStr } },
+        Notes: { rich_text: [{ text: { content: "Created via leave request approval" } }] },
+      },
+    }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    console.error("Notion create page failed:", resp.status, text);
+    throw new Error("Failed to create Notion row: " + text);
+  }
+  return resp.json();
+}
+
+async function createNotionRowsForRequest(env, request) {
+  const days = expandLeaveDates(request.startDate, request.endDate, request.halfDayStart, request.halfDayEnd);
+  for (const day of days) {
+    await createNotionLeavePage(env, request.personName, day.date, day.status);
+  }
+  return days.length;
+}
+
+function renderRequestForm(personName) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>Request Annual Leave</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 480px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+  input[type="date"], textarea {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  .half-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; font-weight: 400; }
+  .half-row input { width: auto; }
+  button.submit-btn {
+    margin-top: 20px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    width: 100%;
+  }
+  button.submit-btn:hover { opacity: 0.9; }
+  button.submit-btn:disabled { background: #999; cursor: default; }
+  .form-message { margin-top: 14px; font-size: 13px; padding: 10px 12px; border-radius: 6px; }
+  .form-message.success { background: #d9ead3; color: #1a4d1a; }
+  .form-message.error { background: #f4cccc; color: #7a1a1a; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Request Annual Leave</h1>
+  <div class="meta">Requesting as ${escapeHtml(personName)}</div>
+
+  <form id="leaveForm">
+    <label for="startDate">Start date</label>
+    <input type="date" id="startDate" name="startDate" required>
+
+    <label for="endDate">End date</label>
+    <input type="date" id="endDate" name="endDate" required>
+
+    <div class="half-row">
+      <input type="checkbox" id="halfDayStart" name="halfDayStart">
+      <label for="halfDayStart" style="margin:0; font-weight:400;" id="halfStartLabel">First day is a half day</label>
+    </div>
+    <div class="half-row" id="halfEndRow" style="display:none;">
+      <input type="checkbox" id="halfDayEnd" name="halfDayEnd">
+      <label for="halfDayEnd" style="margin:0; font-weight:400;">Last day is a half day</label>
+    </div>
+
+    <label for="reason">Reason</label>
+    <textarea id="reason" name="reason" required></textarea>
+
+    <button type="submit" class="submit-btn" id="submitBtn">Submit Request</button>
+    <div id="formMessage"></div>
+  </form>
+
+  ${THEME_PICKER_SCRIPT}
+  <script>
+    (function () {
+      var startInput = document.getElementById('startDate');
+      var endInput = document.getElementById('endDate');
+      var halfEndRow = document.getElementById('halfEndRow');
+      var halfStartLabel = document.getElementById('halfStartLabel');
+
+      function syncHalfDayUI() {
+        var single = startInput.value && startInput.value === endInput.value;
+        halfEndRow.style.display = single ? 'none' : 'flex';
+        halfStartLabel.textContent = single ? 'Half day' : 'First day is a half day';
+      }
+      startInput.addEventListener('change', function () {
+        if (!endInput.value || endInput.value < startInput.value) endInput.value = startInput.value;
+        syncHalfDayUI();
+      });
+      endInput.addEventListener('change', syncHalfDayUI);
+
+      document.getElementById('leaveForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var btn = document.getElementById('submitBtn');
+        var msg = document.getElementById('formMessage');
+        btn.disabled = true;
+        msg.innerHTML = '';
+
+        var payload = {
+          startDate: startInput.value,
+          endDate: endInput.value,
+          halfDayStart: document.getElementById('halfDayStart').checked,
+          halfDayEnd: document.getElementById('halfDayEnd').checked,
+          reason: document.getElementById('reason').value,
+        };
+
+        try {
+          var resp = await fetch('/request-leave', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          var data = await resp.json();
+          if (resp.ok) {
+            msg.innerHTML = '<div class="form-message success">Request submitted. <a href="my-leave-requests">View your requests</a></div>';
+            document.getElementById('leaveForm').reset();
+          } else {
+            msg.innerHTML = '<div class="form-message error">' + (data.error || 'Something went wrong.') + '</div>';
+            btn.disabled = false;
+          }
+        } catch (err) {
+          msg.innerHTML = '<div class="form-message error">Could not submit - check your connection.</div>';
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+async function getGraphToken(env) {
+  const resp = await fetch(`https://login.microsoftonline.com/${env.MAIL_TENANT_ID}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: env.MAIL_CLIENT_ID,
+      client_secret: env.MAIL_CLIENT_SECRET,
+      scope: "https://graph.microsoft.com/.default",
+      grant_type: "client_credentials",
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    console.error("Graph token error:", data);
+    throw new Error("Failed to get mail token");
+  }
+  return data.access_token;
+}
+
+async function sendMail(env, toAddresses, subject, htmlBody) {
+  try {
+    const token = await getGraphToken(env);
+    const resp = await fetch(`https://graph.microsoft.com/v1.0/users/${MAIL_FROM}/sendMail`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          subject,
+          body: { contentType: "HTML", content: htmlBody },
+          toRecipients: toAddresses.map((a) => ({ emailAddress: { address: a } })),
+        },
+        saveToSentItems: false,
+      }),
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error("sendMail failed:", resp.status, text);
+    }
+  } catch (err) {
+    console.error("sendMail error:", err);
+  }
+}
+
+async function getLeaveRequests(env) {
+  try {
+    const stored = await env.LEAVE_KV.get(REQUEST_KV_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (err) {
+    console.error("Failed to read leave requests:", err);
+    return [];
+  }
+}
+
+async function saveLeaveRequests(env, requests) {
+  await env.LEAVE_KV.put(REQUEST_KV_KEY, JSON.stringify(requests));
+}
+
+function formatDateRangeLabel(startDate, endDate, halfDayStart, halfDayEnd) {
+  const fmt = (d) =>
+    new Date(d + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" });
+  let label = startDate === endDate ? fmt(startDate) : `${fmt(startDate)} \u2192 ${fmt(endDate)}`;
+  const halves = [];
+  if (halfDayStart) halves.push("first day half");
+  if (halfDayEnd && endDate !== startDate) halves.push("last day half");
+  if (halfDayStart && startDate === endDate) return `${label} (half day)`;
+  if (halves.length) label += ` (${halves.join(", ")})`;
+  return label;
+}
+
+function renderMyRequests(personName, requests) {
+  const mine = requests
+    .filter((r) => r.personName === personName)
+    .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1));
+
+  const itemsHtml = mine.length
+    ? mine
+        .map((r) => {
+          const label = formatDateRangeLabel(r.startDate, r.endDate, r.halfDayStart, r.halfDayEnd);
+          let statusHtml;
+          if (r.status === "pending") {
+            statusHtml = `<span class="req-status pending">In Progress</span>`;
+          } else if (r.status === "accepted") {
+            statusHtml = `<span class="req-status accepted">Accepted</span> <span class="req-decided">by ${escapeHtml(r.decidedBy)}, ${escapeHtml(formatLogTime(r.decidedAt))}</span>`;
+          } else {
+            statusHtml = `<span class="req-status rejected">Rejected</span> <span class="req-decided">by ${escapeHtml(r.decidedBy)}, ${escapeHtml(formatLogTime(r.decidedAt))}</span>`;
+          }
+          const noteHtml = r.status === "rejected" && r.rejectionNote
+            ? `<div class="req-note">Reason: ${escapeHtml(r.rejectionNote)}</div>`
+            : "";
+          return `<div class="req-card">
+            <div class="req-dates">${escapeHtml(label)}</div>
+            <div class="req-reason">${escapeHtml(r.reason)}</div>
+            <div class="req-status-row">${statusHtml}</div>
+            ${noteHtml}
+          </div>`;
+        })
+        .join("")
+    : `<div class="empty">You haven't requested any annual leave yet.</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>My Leave Requests</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 560px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  .req-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .req-dates { font-weight: 600; font-size: 14px; }
+  .req-reason { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .req-status-row { margin-top: 8px; font-size: 12px; }
+  .req-status { font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+  .req-status.pending { background: #fff2cc; color: #7a5b00; }
+  .req-status.accepted { background: #d9ead3; color: #1a4d1a; }
+  .req-status.rejected { background: #f4cccc; color: #7a1a1a; }
+  .req-decided { color: var(--text-dim); }
+  .req-note { font-size: 12px; color: var(--text-dim); font-style: italic; margin-top: 6px; }
+  .empty { color: var(--text-dim); font-size: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>My Leave Requests</h1>
+  <div class="meta">${escapeHtml(personName)}</div>
+  ${itemsHtml}
+  ${THEME_PICKER_SCRIPT}
+</body>
+</html>`;
+}
+
+function renderApprovalsPage(requests, message) {
+  const pending = requests.filter((r) => r.status === "pending").sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
+  const decided = requests.filter((r) => r.status !== "pending").sort((a, b) => (a.decidedAt < b.decidedAt ? 1 : -1));
+
+  const pendingHtml = pending.length
+    ? pending
+        .map((r) => {
+          const label = formatDateRangeLabel(r.startDate, r.endDate, r.halfDayStart, r.halfDayEnd);
+          return `<div class="req-card" data-id="${escapeHtml(r.id)}">
+            <div class="req-summary" onclick="toggleDetail('${escapeHtml(r.id)}')">
+              <div>
+                <div class="req-dates">${escapeHtml(r.personName)} &middot; ${escapeHtml(label)}</div>
+                <div class="req-reason-preview">${escapeHtml(r.reason.slice(0, 60))}${r.reason.length > 60 ? "\u2026" : ""}</div>
+              </div>
+              <span class="expand-arrow">&darr;</span>
+            </div>
+            <div class="req-detail" id="detail-${escapeHtml(r.id)}">
+              <div class="req-reason">${escapeHtml(r.reason)}</div>
+              <div class="req-submitted">Submitted ${escapeHtml(formatLogTime(r.submittedAt))}</div>
+              <div class="decision-row">
+                <button class="approve-btn" onclick="decide('${escapeHtml(r.id)}', 'accept')">Approve</button>
+                <button class="deny-btn" onclick="showDenyNote('${escapeHtml(r.id)}')">Deny</button>
+              </div>
+              <div class="deny-note-row" id="denyRow-${escapeHtml(r.id)}" style="display:none;">
+                <textarea id="denyNote-${escapeHtml(r.id)}" placeholder="Reason for declining (required)"></textarea>
+                <button class="confirm-deny-btn" onclick="decide('${escapeHtml(r.id)}', 'reject')">Confirm Deny</button>
+              </div>
+            </div>
+          </div>`;
+        })
+        .join("")
+    : `<div class="empty">No pending requests.</div>`;
+
+  const decidedHtml = decided.length
+    ? decided
+        .map((r) => {
+          const label = formatDateRangeLabel(r.startDate, r.endDate, r.halfDayStart, r.halfDayEnd);
+          const statusClass = r.status === "accepted" ? "accepted" : "rejected";
+          return `<div class="log-entry">
+            <span class="log-time">${escapeHtml(formatLogTime(r.decidedAt))}</span>
+            <span class="req-status ${statusClass}">${r.status === "accepted" ? "Accepted" : "Rejected"}</span>
+            <span class="log-desc">${escapeHtml(r.personName)} \u2014 ${escapeHtml(label)}, decided by ${escapeHtml(r.decidedBy)}</span>
+          </div>`;
+        })
+        .join("")
+    : `<div class="log-empty">No decisions yet.</div>`;
+
+  const messageHtml = message ? `<div class="page-message">${escapeHtml(message)}</div>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>Approve Leave Requests</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 560px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
+  .page-message { font-size: 13px; padding: 10px 12px; border-radius: 6px; background: #d9ead3; color: #1a4d1a; margin-bottom: 14px; }
+  .req-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .req-summary { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; cursor: pointer; }
+  .req-dates { font-weight: 600; font-size: 14px; }
+  .req-reason-preview { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .expand-arrow { color: var(--text-dim); }
+  .req-detail { display: none; padding: 0 14px 14px; border-top: 1px solid var(--border); }
+  .req-detail.open { display: block; }
+  .req-reason { font-size: 13px; padding-top: 10px; }
+  .req-submitted { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .decision-row { display: flex; gap: 10px; margin-top: 12px; }
+  .approve-btn, .deny-btn, .confirm-deny-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #fff;
+  }
+  .approve-btn { background: #2a9d4a; }
+  .deny-btn { background: #c0392b; }
+  .confirm-deny-btn { background: #c0392b; margin-top: 8px; }
+  .deny-note-row { margin-top: 10px; }
+  .deny-note-row textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .empty { color: var(--text-dim); font-size: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .decided-heading { font-size: 14px; font-weight: 600; margin: 24px 0 10px; }
+  .log-entry { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; flex-wrap: wrap; background: var(--surface); border-radius: 6px; margin-bottom: 6px; }
+  .log-time { color: var(--text-dim); min-width: 130px; }
+  .log-desc { color: var(--text); }
+  .log-empty { padding: 14px; color: var(--text-dim); font-size: 13px; }
+  .req-status { font-weight: 700; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .req-status.accepted { background: #d9ead3; color: #1a4d1a; }
+  .req-status.rejected { background: #f4cccc; color: #7a1a1a; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Approve Leave Requests</h1>
+  <div class="meta">Click a request to see full details and decide.</div>
+  ${messageHtml}
+  ${pendingHtml}
+  <div class="decided-heading">Recent decisions</div>
+  ${decidedHtml}
+  ${THEME_PICKER_SCRIPT}
+  <script>
+    function toggleDetail(id) {
+      document.getElementById('detail-' + id).classList.toggle('open');
+    }
+    function showDenyNote(id) {
+      document.getElementById('denyRow-' + id).style.display = 'block';
+    }
+    async function decide(id, action) {
+      var note = '';
+      if (action === 'reject') {
+        note = document.getElementById('denyNote-' + id).value.trim();
+        if (!note) {
+          alert('Please add a reason before denying.');
+          return;
+        }
+      }
+      try {
+        var resp = await fetch('/approve-leave', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ id: id, action: action, note: note }),
+        });
+        if (resp.ok) {
+          location.reload();
+        } else {
+          var data = await resp.json();
+          alert(data.error || 'Something went wrong.');
+        }
+      } catch (err) {
+        alert('Could not submit - check your connection.');
+      }
+    }
+  </script>
+</body>
+</html>`;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -1741,6 +2280,193 @@ export default {
       }
 
       return new Response(renderSickTracker(sickData, sickRows, sickChangeLog), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/request-leave") {
+      const email = decodeAccessEmail(request);
+      const personName = email ? EMAIL_TO_NAME[email] : null;
+
+      if (!personName) {
+        return new Response("Your account isn't linked to a name yet. Check with Iestyn.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      if (request.method === "POST") {
+        if (!env.LEAVE_KV) {
+          return new Response(JSON.stringify({ error: "Storage isn't set up (missing LEAVE_KV binding)." }), {
+            status: 500,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        let body;
+        try {
+          body = await request.json();
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Invalid data." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const startDate = typeof body.startDate === "string" ? body.startDate : "";
+        const endDate = typeof body.endDate === "string" ? body.endDate : "";
+        const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+        const halfDayStart = !!body.halfDayStart;
+        const halfDayEnd = !!body.halfDayEnd;
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+          return new Response(JSON.stringify({ error: "Please provide valid dates." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (endDate < startDate) {
+          return new Response(JSON.stringify({ error: "End date can't be before the start date." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (!reason) {
+          return new Response(JSON.stringify({ error: "Please add a reason." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const newRequest = {
+          id: generateRequestId(),
+          personEmail: email,
+          personName,
+          startDate,
+          endDate,
+          halfDayStart,
+          halfDayEnd,
+          reason,
+          submittedAt: new Date().toISOString(),
+          status: "pending",
+          decidedBy: null,
+          decidedAt: null,
+          rejectionNote: null,
+        };
+
+        const requests = await getLeaveRequests(env);
+        requests.push(newRequest);
+        await saveLeaveRequests(env, requests);
+
+        const label = formatDateRangeLabel(startDate, endDate, halfDayStart, halfDayEnd);
+        ctx.waitUntil(
+          sendMail(
+            env,
+            APPROVER_EMAILS,
+            `Annual leave request - ${personName}`,
+            `<p><strong>${escapeHtml(personName)}</strong> has requested annual leave.</p>
+             <p><strong>Dates:</strong> ${escapeHtml(label)}<br>
+             <strong>Reason:</strong> ${escapeHtml(reason)}</p>
+             <p><a href="https://carlam-schedule.iestyn-041.workers.dev/approve-leave">Review this request</a></p>`
+          )
+        );
+
+        return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+      }
+
+      return new Response(renderRequestForm(personName), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/my-leave-requests") {
+      const email = decodeAccessEmail(request);
+      const personName = email ? EMAIL_TO_NAME[email] : null;
+
+      if (!personName) {
+        return new Response("Your account isn't linked to a name yet. Check with Iestyn.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      const requests = env.LEAVE_KV ? await getLeaveRequests(env) : [];
+      return new Response(renderMyRequests(personName, requests), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/approve-leave") {
+      const email = decodeAccessEmail(request);
+
+      if (!email || !ANNUAL_LEAVE_VIEWERS.has(email)) {
+        return new Response("Not authorised.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      if (!env.LEAVE_KV) {
+        return new Response("Leave data storage isn't set up yet (missing LEAVE_KV binding).", {
+          status: 500,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      if (request.method === "POST") {
+        let body;
+        try {
+          body = await request.json();
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Invalid data." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const { id, action, note } = body;
+        if (!id || (action !== "accept" && action !== "reject")) {
+          return new Response(JSON.stringify({ error: "Invalid request." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (action === "reject" && !(note && note.trim())) {
+          return new Response(JSON.stringify({ error: "A reason is required to deny a request." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const requests = await getLeaveRequests(env);
+        const idx = requests.findIndex((r) => r.id === id);
+        if (idx === -1) {
+          return new Response(JSON.stringify({ error: "Request not found." }), { status: 404, headers: { "content-type": "application/json" } });
+        }
+        if (requests[idx].status !== "pending") {
+          return new Response(JSON.stringify({ error: "This request has already been decided." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const decidedBy = EMAIL_TO_NAME[email] || email;
+        const nowISO = new Date().toISOString();
+        const reqRecord = requests[idx];
+
+        reqRecord.status = action === "accept" ? "accepted" : "rejected";
+        reqRecord.decidedBy = decidedBy;
+        reqRecord.decidedAt = nowISO;
+        reqRecord.rejectionNote = action === "reject" ? note.trim() : null;
+
+        await saveLeaveRequests(env, requests);
+
+        if (action === "accept") {
+          try {
+            await createNotionRowsForRequest(env, reqRecord);
+          } catch (err) {
+            console.error("Failed to create Notion rows for approved leave:", err);
+            return new Response(
+              JSON.stringify({ error: "Approved, but failed to write to the schedule. Check the logs." }),
+              { status: 500, headers: { "content-type": "application/json" } }
+            );
+          }
+        }
+
+        const label = formatDateRangeLabel(reqRecord.startDate, reqRecord.endDate, reqRecord.halfDayStart, reqRecord.halfDayEnd);
+        const outcomeText = action === "accept" ? "accepted" : "declined";
+        const noteBlock = action === "reject" ? `<p><strong>Reason:</strong> ${escapeHtml(reqRecord.rejectionNote)}</p>` : "";
+        ctx.waitUntil(
+          sendMail(
+            env,
+            [reqRecord.personEmail],
+            `Your annual leave request has been ${outcomeText}`,
+            `<p>Your annual leave request for <strong>${escapeHtml(label)}</strong> has been <strong>${outcomeText}</strong> by ${escapeHtml(decidedBy)}.</p>
+             ${noteBlock}`
+          )
+        );
+
+        return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+      }
+
+      const requests = await getLeaveRequests(env);
+      return new Response(renderApprovalsPage(requests, null), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
