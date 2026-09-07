@@ -1499,7 +1499,7 @@ function expandLeaveDates(startDate, endDate, halfDayStart, halfDayEnd) {
   return days;
 }
 
-async function createNotionLeavePage(env, personName, dateStr, status) {
+async function createNotionLeavePage(env, personName, dateStr, status, noteText) {
   const resp = await fetch("https://api.notion.com/v1/pages", {
     method: "POST",
     headers: {
@@ -1514,7 +1514,7 @@ async function createNotionLeavePage(env, personName, dateStr, status) {
         "Person Name": { select: { name: personName } },
         Status: { select: { name: status } },
         Date: { date: { start: dateStr } },
-        Notes: { rich_text: [{ text: { content: "Created via leave request approval" } }] },
+        Notes: { rich_text: [{ text: { content: noteText } }] },
       },
     }),
   });
@@ -1528,8 +1528,10 @@ async function createNotionLeavePage(env, personName, dateStr, status) {
 
 async function createNotionRowsForRequest(env, request) {
   const days = expandLeaveDates(request.startDate, request.endDate, request.halfDayStart, request.halfDayEnd);
+  const decidedAtFormatted = formatLogTime(request.decidedAt);
+  const noteText = `Approved by ${request.decidedBy} on ${decidedAtFormatted}`;
   for (const day of days) {
-    await createNotionLeavePage(env, request.personName, day.date, day.status);
+    await createNotionLeavePage(env, request.personName, day.date, day.status, noteText);
   }
   return days.length;
 }
