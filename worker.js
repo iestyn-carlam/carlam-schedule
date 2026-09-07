@@ -103,7 +103,7 @@ function escapeHtml(str) {
 // and never reference these variables, so they stay exactly the same
 // regardless of theme.
 const THEME_VARS_CSS = `
-  :root, [data-theme="dark"] {
+  :root, [data-mode="dark"][data-colour="blue"] {
     --bg: #0b0b0c;
     --surface: #17171a;
     --surface-hover: #1f1f23;
@@ -112,7 +112,7 @@ const THEME_VARS_CSS = `
     --text-dim: #8b8b90;
     --accent: #3f7fd1;
   }
-  [data-theme="light"] {
+  [data-mode="light"][data-colour="blue"] {
     --bg: #fafafa;
     --surface: #ffffff;
     --surface-hover: #f0f0f0;
@@ -121,87 +121,58 @@ const THEME_VARS_CSS = `
     --text-dim: #666666;
     --accent: #3f7fd1;
   }
-  [data-theme="midnight"] {
-    --bg: #0a0e17;
-    --surface: #131a2b;
-    --surface-hover: #1b2438;
-    --border: #232f45;
-    --text: #e8ecf5;
-    --text-dim: #7a8699;
-    --accent: #5b8dd9;
+  [data-mode="dark"][data-colour="pink"] {
+    --bg: hsl(330, 25%, 7%); --surface: hsl(330, 20%, 12%); --surface-hover: hsl(330, 18%, 16%);
+    --border: hsl(330, 16%, 20%); --text: hsl(330, 12%, 95%); --text-dim: hsl(330, 10%, 63%); --accent: hsl(330, 70%, 58%);
   }
-  [data-theme="pink"] {
-    --bg: hsl(330, 25%, 7%);
-    --surface: hsl(330, 20%, 12%);
-    --surface-hover: hsl(330, 18%, 16%);
-    --border: hsl(330, 16%, 20%);
-    --text: hsl(330, 12%, 95%);
-    --text-dim: hsl(330, 10%, 63%);
-    --accent: hsl(330, 70%, 58%);
+  [data-mode="light"][data-colour="pink"] {
+    --bg: hsl(330, 45%, 96%); --surface: hsl(330, 35%, 99%); --surface-hover: hsl(330, 35%, 92%);
+    --border: hsl(330, 30%, 85%); --text: hsl(330, 35%, 15%); --text-dim: hsl(330, 15%, 42%); --accent: hsl(330, 75%, 45%);
   }
-  [data-theme="red"] {
-    --bg: hsl(355, 25%, 7%);
-    --surface: hsl(355, 20%, 12%);
-    --surface-hover: hsl(355, 18%, 16%);
-    --border: hsl(355, 16%, 20%);
-    --text: hsl(355, 12%, 95%);
-    --text-dim: hsl(355, 10%, 63%);
-    --accent: hsl(355, 70%, 58%);
+  [data-mode="dark"][data-colour="red"] {
+    --bg: hsl(355, 25%, 7%); --surface: hsl(355, 20%, 12%); --surface-hover: hsl(355, 18%, 16%);
+    --border: hsl(355, 16%, 20%); --text: hsl(355, 12%, 95%); --text-dim: hsl(355, 10%, 63%); --accent: hsl(355, 70%, 58%);
   }
-  [data-theme="green"] {
-    --bg: hsl(150, 25%, 7%);
-    --surface: hsl(150, 20%, 12%);
-    --surface-hover: hsl(150, 18%, 16%);
-    --border: hsl(150, 16%, 20%);
-    --text: hsl(150, 12%, 95%);
-    --text-dim: hsl(150, 10%, 63%);
-    --accent: hsl(150, 70%, 58%);
+  [data-mode="light"][data-colour="red"] {
+    --bg: hsl(355, 45%, 96%); --surface: hsl(355, 35%, 99%); --surface-hover: hsl(355, 35%, 92%);
+    --border: hsl(355, 30%, 85%); --text: hsl(355, 35%, 15%); --text-dim: hsl(355, 15%, 42%); --accent: hsl(355, 75%, 45%);
   }
-  [data-theme="blue"] {
-    --bg: hsl(215, 25%, 7%);
-    --surface: hsl(215, 20%, 12%);
-    --surface-hover: hsl(215, 18%, 16%);
-    --border: hsl(215, 16%, 20%);
-    --text: hsl(215, 12%, 95%);
-    --text-dim: hsl(215, 10%, 63%);
-    --accent: hsl(215, 70%, 58%);
+  [data-mode="dark"][data-colour="green"] {
+    --bg: hsl(150, 25%, 7%); --surface: hsl(150, 20%, 12%); --surface-hover: hsl(150, 18%, 16%);
+    --border: hsl(150, 16%, 20%); --text: hsl(150, 12%, 95%); --text-dim: hsl(150, 10%, 63%); --accent: hsl(150, 70%, 58%);
   }
-  [data-theme="purple"] {
-    --bg: hsl(265, 25%, 7%);
-    --surface: hsl(265, 20%, 12%);
-    --surface-hover: hsl(265, 18%, 16%);
-    --border: hsl(265, 16%, 20%);
-    --text: hsl(265, 12%, 95%);
-    --text-dim: hsl(265, 10%, 63%);
-    --accent: hsl(265, 70%, 58%);
+  [data-mode="light"][data-colour="green"] {
+    --bg: hsl(150, 45%, 96%); --surface: hsl(150, 35%, 99%); --surface-hover: hsl(150, 35%, 92%);
+    --border: hsl(150, 30%, 85%); --text: hsl(150, 35%, 15%); --text-dim: hsl(150, 15%, 42%); --accent: hsl(150, 75%, 45%);
   }
-  [data-theme="orange"] {
-    --bg: hsl(25, 25%, 7%);
-    --surface: hsl(25, 20%, 12%);
-    --surface-hover: hsl(25, 18%, 16%);
-    --border: hsl(25, 16%, 20%);
-    --text: hsl(25, 12%, 95%);
-    --text-dim: hsl(25, 10%, 63%);
-    --accent: hsl(25, 70%, 58%);
+  [data-mode="dark"][data-colour="purple"] {
+    --bg: hsl(265, 25%, 7%); --surface: hsl(265, 20%, 12%); --surface-hover: hsl(265, 18%, 16%);
+    --border: hsl(265, 16%, 20%); --text: hsl(265, 12%, 95%); --text-dim: hsl(265, 10%, 63%); --accent: hsl(265, 70%, 58%);
   }
-  [data-theme="light-blue"] {
-    --bg: hsl(205, 45%, 96%);
-    --surface: hsl(205, 35%, 99%);
-    --surface-hover: hsl(205, 35%, 92%);
-    --border: hsl(205, 30%, 85%);
-    --text: hsl(205, 35%, 15%);
-    --text-dim: hsl(205, 15%, 42%);
-    --accent: hsl(205, 75%, 45%);
+  [data-mode="light"][data-colour="purple"] {
+    --bg: hsl(265, 45%, 96%); --surface: hsl(265, 35%, 99%); --surface-hover: hsl(265, 35%, 92%);
+    --border: hsl(265, 30%, 85%); --text: hsl(265, 35%, 15%); --text-dim: hsl(265, 15%, 42%); --accent: hsl(265, 75%, 45%);
+  }
+  [data-mode="dark"][data-colour="orange"] {
+    --bg: hsl(25, 25%, 7%); --surface: hsl(25, 20%, 12%); --surface-hover: hsl(25, 18%, 16%);
+    --border: hsl(25, 16%, 20%); --text: hsl(25, 12%, 95%); --text-dim: hsl(25, 10%, 63%); --accent: hsl(25, 70%, 58%);
+  }
+  [data-mode="light"][data-colour="orange"] {
+    --bg: hsl(25, 45%, 96%); --surface: hsl(25, 35%, 99%); --surface-hover: hsl(25, 35%, 92%);
+    --border: hsl(25, 30%, 85%); --text: hsl(25, 35%, 15%); --text-dim: hsl(25, 15%, 42%); --accent: hsl(25, 75%, 45%);
   }
 `;
 
 // Placed first thing in <head>, before any other styling, so the page
-// never flashes the wrong theme before this runs.
+// never flashes the wrong theme before this runs. Cookie stores
+// "mode:colour" (e.g. "dark:blue"), so the two are remembered together
+// but chosen independently on the page.
 const THEME_BOOTSTRAP_SCRIPT = `<script>
 (function () {
   var m = document.cookie.match(/(?:^|; )carlam_theme=([^;]+)/);
-  var theme = m ? decodeURIComponent(m[1]) : 'dark';
-  document.documentElement.setAttribute('data-theme', theme);
+  var parts = (m ? decodeURIComponent(m[1]) : 'dark:blue').split(':');
+  document.documentElement.setAttribute('data-mode', parts[0] || 'dark');
+  document.documentElement.setAttribute('data-colour', parts[1] || 'blue');
 })();
 </script>`;
 
@@ -245,38 +216,62 @@ const THEME_PICKER_CSS = `
     cursor: pointer;
     padding: 0;
   }
-  .theme-swatch[data-theme-btn="midnight"] { background: #5b8dd9; }
-  .theme-swatch[data-theme-btn="pink"] { background: hsl(330, 70%, 58%); }
-  .theme-swatch[data-theme-btn="red"] { background: hsl(355, 70%, 58%); }
-  .theme-swatch[data-theme-btn="green"] { background: hsl(150, 70%, 58%); }
-  .theme-swatch[data-theme-btn="blue"] { background: hsl(215, 70%, 58%); }
-  .theme-swatch[data-theme-btn="purple"] { background: hsl(265, 70%, 58%); }
-  .theme-swatch[data-theme-btn="orange"] { background: hsl(25, 70%, 58%); }
-  .theme-swatch[data-theme-btn="light-blue"] { background: hsl(205, 75%, 45%); }
-  .theme-swatch[data-theme-btn="dark"], .theme-swatch[data-theme-btn="light"] {
-    background: linear-gradient(135deg, #0b0b0c 50%, #fafafa 50%);
-  }
+  .theme-swatch[data-colour-btn="pink"] { background: hsl(330, 70%, 58%); }
+  .theme-swatch[data-colour-btn="red"] { background: hsl(355, 70%, 58%); }
+  .theme-swatch[data-colour-btn="green"] { background: hsl(150, 70%, 58%); }
+  .theme-swatch[data-colour-btn="blue"] { background: hsl(215, 70%, 58%); }
+  .theme-swatch[data-colour-btn="purple"] { background: hsl(265, 70%, 58%); }
+  .theme-swatch[data-colour-btn="orange"] { background: hsl(25, 70%, 58%); }
   .theme-swatch.active { border-color: #fff; box-shadow: 0 0 0 1px var(--accent); }
+  .mode-toggle-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 `;
 
-const THEME_PICKER_HTML = `<div class="theme-picker-fixed">
-  <button class="theme-toggle-btn" id="themeToggleBtn" aria-label="Choose theme" title="Theme"></button>
-  <div class="theme-panel" id="themePanel">
-    <button class="theme-swatch" data-theme-btn="dark" aria-label="Dark theme"></button>
-    <button class="theme-swatch" data-theme-btn="light" aria-label="Light theme"></button>
-    <button class="theme-swatch" data-theme-btn="midnight" aria-label="Midnight theme"></button>
-    <button class="theme-swatch" data-theme-btn="pink" aria-label="Pink theme"></button>
-    <button class="theme-swatch" data-theme-btn="red" aria-label="Red theme"></button>
-    <button class="theme-swatch" data-theme-btn="green" aria-label="Green theme"></button>
-    <button class="theme-swatch" data-theme-btn="blue" aria-label="Blue theme"></button>
-    <button class="theme-swatch" data-theme-btn="purple" aria-label="Purple theme"></button>
-    <button class="theme-swatch" data-theme-btn="orange" aria-label="Orange theme"></button>
-    <button class="theme-swatch" data-theme-btn="light-blue" aria-label="Light blue theme"></button>
+const THEME_PICKER_HTML = `<div class="theme-picker-fixed" style="display:flex; gap:8px; align-items:flex-start;">
+  <button class="mode-toggle-btn" id="modeToggleBtn" aria-label="Toggle light or dark mode" title="Light / Dark"></button>
+  <div style="position:relative;">
+    <button class="theme-toggle-btn" id="themeToggleBtn" aria-label="Choose colour" title="Colour"></button>
+    <div class="theme-panel" id="themePanel">
+      <button class="theme-swatch" data-colour-btn="blue" aria-label="Blue"></button>
+      <button class="theme-swatch" data-colour-btn="pink" aria-label="Pink"></button>
+      <button class="theme-swatch" data-colour-btn="red" aria-label="Red"></button>
+      <button class="theme-swatch" data-colour-btn="green" aria-label="Green"></button>
+      <button class="theme-swatch" data-colour-btn="purple" aria-label="Purple"></button>
+      <button class="theme-swatch" data-colour-btn="orange" aria-label="Orange"></button>
+    </div>
   </div>
 </div>`;
 
 const THEME_PICKER_SCRIPT = `<script>
 (function () {
+  function applyTheme(mode, colour) {
+    document.cookie = 'carlam_theme=' + mode + ':' + colour + '; path=/; max-age=31536000';
+    location.reload();
+  }
+
+  var modeBtn = document.getElementById('modeToggleBtn');
+  if (modeBtn) {
+    var currentMode = document.documentElement.getAttribute('data-mode') || 'dark';
+    var currentColour = document.documentElement.getAttribute('data-colour') || 'blue';
+    modeBtn.textContent = currentMode === 'light' ? '\u2600\ufe0f' : '\ud83c\udf19';
+    modeBtn.addEventListener('click', function () {
+      applyTheme(currentMode === 'light' ? 'dark' : 'light', currentColour);
+    });
+  }
+
   var toggleBtn = document.getElementById('themeToggleBtn');
   var panel = document.getElementById('themePanel');
   if (!toggleBtn || !panel) return;
@@ -291,13 +286,12 @@ const THEME_PICKER_SCRIPT = `<script>
     }
   });
 
-  var current = document.documentElement.getAttribute('data-theme') || 'dark';
+  var mode = document.documentElement.getAttribute('data-mode') || 'dark';
+  var colour = document.documentElement.getAttribute('data-colour') || 'blue';
   document.querySelectorAll('.theme-swatch').forEach(function (btn) {
-    if (btn.getAttribute('data-theme-btn') === current) btn.classList.add('active');
+    if (btn.getAttribute('data-colour-btn') === colour) btn.classList.add('active');
     btn.addEventListener('click', function () {
-      var theme = this.getAttribute('data-theme-btn');
-      document.cookie = 'carlam_theme=' + theme + '; path=/; max-age=31536000';
-      location.reload();
+      applyTheme(mode, this.getAttribute('data-colour-btn'));
     });
   });
 })();
@@ -325,7 +319,7 @@ const PAGE_STYLE = `
      themes, inverting the colours turns it black - visible against a light
      page - while transparent areas stay transparent (invert doesn't touch
      alpha), so no second image file is needed. */
-  [data-theme="light"] .logo, [data-theme="light-blue"] .logo {
+  [data-mode="light"] .logo {
     filter: invert(1);
   }
   .logo-wrap img { width: 120px; height: auto; display: inline-block; }
