@@ -93,10 +93,17 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-const PAGE_STYLE = `
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
-
-  :root {
+// --- Shared theming system --------------------------------------------
+// Three colour themes, chosen via a small picker on every page and
+// remembered via a cookie (so it applies consistently across the homepage,
+// team/master schedules, personal schedule, and both trackers - all of
+// which are otherwise rendered by two different systems, JS here and
+// Python in generate_webpage.py). Only layout colours are themed - task
+// and programme colours are always set as direct inline styles elsewhere
+// and never reference these variables, so they stay exactly the same
+// regardless of theme.
+const THEME_VARS_CSS = `
+  :root, [data-theme="dark"] {
     --bg: #0b0b0c;
     --surface: #17171a;
     --surface-hover: #1f1f23;
@@ -105,6 +112,153 @@ const PAGE_STYLE = `
     --text-dim: #8b8b90;
     --accent: #3f7fd1;
   }
+  [data-theme="light"] {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-hover: #f0f0f0;
+    --border: #e0e0e0;
+    --text: #1a1a1a;
+    --text-dim: #666666;
+    --accent: #3f7fd1;
+  }
+  [data-theme="midnight"] {
+    --bg: #0a0e17;
+    --surface: #131a2b;
+    --surface-hover: #1b2438;
+    --border: #232f45;
+    --text: #e8ecf5;
+    --text-dim: #7a8699;
+    --accent: #5b8dd9;
+  }
+  [data-theme="pink"] {
+    --bg: hsl(330, 25%, 7%);
+    --surface: hsl(330, 20%, 12%);
+    --surface-hover: hsl(330, 18%, 16%);
+    --border: hsl(330, 16%, 20%);
+    --text: hsl(330, 12%, 95%);
+    --text-dim: hsl(330, 10%, 63%);
+    --accent: hsl(330, 70%, 58%);
+  }
+  [data-theme="red"] {
+    --bg: hsl(355, 25%, 7%);
+    --surface: hsl(355, 20%, 12%);
+    --surface-hover: hsl(355, 18%, 16%);
+    --border: hsl(355, 16%, 20%);
+    --text: hsl(355, 12%, 95%);
+    --text-dim: hsl(355, 10%, 63%);
+    --accent: hsl(355, 70%, 58%);
+  }
+  [data-theme="green"] {
+    --bg: hsl(150, 25%, 7%);
+    --surface: hsl(150, 20%, 12%);
+    --surface-hover: hsl(150, 18%, 16%);
+    --border: hsl(150, 16%, 20%);
+    --text: hsl(150, 12%, 95%);
+    --text-dim: hsl(150, 10%, 63%);
+    --accent: hsl(150, 70%, 58%);
+  }
+  [data-theme="blue"] {
+    --bg: hsl(215, 25%, 7%);
+    --surface: hsl(215, 20%, 12%);
+    --surface-hover: hsl(215, 18%, 16%);
+    --border: hsl(215, 16%, 20%);
+    --text: hsl(215, 12%, 95%);
+    --text-dim: hsl(215, 10%, 63%);
+    --accent: hsl(215, 70%, 58%);
+  }
+  [data-theme="purple"] {
+    --bg: hsl(265, 25%, 7%);
+    --surface: hsl(265, 20%, 12%);
+    --surface-hover: hsl(265, 18%, 16%);
+    --border: hsl(265, 16%, 20%);
+    --text: hsl(265, 12%, 95%);
+    --text-dim: hsl(265, 10%, 63%);
+    --accent: hsl(265, 70%, 58%);
+  }
+  [data-theme="orange"] {
+    --bg: hsl(25, 25%, 7%);
+    --surface: hsl(25, 20%, 12%);
+    --surface-hover: hsl(25, 18%, 16%);
+    --border: hsl(25, 16%, 20%);
+    --text: hsl(25, 12%, 95%);
+    --text-dim: hsl(25, 10%, 63%);
+    --accent: hsl(25, 70%, 58%);
+  }
+  [data-theme="light-blue"] {
+    --bg: hsl(205, 45%, 96%);
+    --surface: hsl(205, 35%, 99%);
+    --surface-hover: hsl(205, 35%, 92%);
+    --border: hsl(205, 30%, 85%);
+    --text: hsl(205, 35%, 15%);
+    --text-dim: hsl(205, 15%, 42%);
+    --accent: hsl(205, 75%, 45%);
+  }
+`;
+
+// Placed first thing in <head>, before any other styling, so the page
+// never flashes the wrong theme before this runs.
+const THEME_BOOTSTRAP_SCRIPT = `<script>
+(function () {
+  var m = document.cookie.match(/(?:^|; )carlam_theme=([^;]+)/);
+  var theme = m ? decodeURIComponent(m[1]) : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>`;
+
+const THEME_PICKER_CSS = `
+  .theme-picker { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 200px; }
+  .theme-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    padding: 0;
+  }
+  .theme-swatch[data-theme-btn="midnight"] { background: #5b8dd9; }
+  .theme-swatch[data-theme-btn="pink"] { background: hsl(330, 70%, 58%); }
+  .theme-swatch[data-theme-btn="red"] { background: hsl(355, 70%, 58%); }
+  .theme-swatch[data-theme-btn="green"] { background: hsl(150, 70%, 58%); }
+  .theme-swatch[data-theme-btn="blue"] { background: hsl(215, 70%, 58%); }
+  .theme-swatch[data-theme-btn="purple"] { background: hsl(265, 70%, 58%); }
+  .theme-swatch[data-theme-btn="orange"] { background: hsl(25, 70%, 58%); }
+  .theme-swatch[data-theme-btn="light-blue"] { background: hsl(205, 75%, 45%); }
+  .theme-swatch[data-theme-btn="dark"], .theme-swatch[data-theme-btn="light"] {
+    background: linear-gradient(135deg, #0b0b0c 50%, #fafafa 50%);
+  }
+  .theme-swatch.active { border-color: #fff; box-shadow: 0 0 0 1px var(--accent); }
+`;
+
+const THEME_PICKER_HTML = `<div class="theme-picker" title="Theme">
+  <button class="theme-swatch" data-theme-btn="dark" aria-label="Dark theme"></button>
+  <button class="theme-swatch" data-theme-btn="light" aria-label="Light theme"></button>
+  <button class="theme-swatch" data-theme-btn="midnight" aria-label="Midnight theme"></button>
+  <button class="theme-swatch" data-theme-btn="pink" aria-label="Pink theme"></button>
+  <button class="theme-swatch" data-theme-btn="red" aria-label="Red theme"></button>
+  <button class="theme-swatch" data-theme-btn="green" aria-label="Green theme"></button>
+  <button class="theme-swatch" data-theme-btn="blue" aria-label="Blue theme"></button>
+  <button class="theme-swatch" data-theme-btn="purple" aria-label="Purple theme"></button>
+  <button class="theme-swatch" data-theme-btn="orange" aria-label="Orange theme"></button>
+  <button class="theme-swatch" data-theme-btn="light-blue" aria-label="Light blue theme"></button>
+</div>`;
+
+const THEME_PICKER_SCRIPT = `<script>
+(function () {
+  var current = document.documentElement.getAttribute('data-theme') || 'dark';
+  document.querySelectorAll('.theme-swatch').forEach(function (btn) {
+    if (btn.getAttribute('data-theme-btn') === current) btn.classList.add('active');
+    btn.addEventListener('click', function () {
+      var theme = this.getAttribute('data-theme-btn');
+      document.cookie = 'carlam_theme=' + theme + '; path=/; max-age=31536000';
+      location.reload();
+    });
+  });
+})();
+</script>`;
+
+const PAGE_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -519,12 +673,14 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="120">
+${THEME_BOOTSTRAP_SCRIPT}
 <title>Carlam Schedules</title>
-<style>${PAGE_STYLE}</style>
+<style>${THEME_VARS_CSS}${THEME_PICKER_CSS}${PAGE_STYLE}</style>
 </head>
 <body>
   <div class="page">
     <div class="logo-wrap"><img src="/carlam-logo.png" alt="Carlam"></div>
+    <div style="display:flex; justify-content:center; margin-bottom:20px;">${THEME_PICKER_HTML}</div>
     <h1>Schedules</h1>
     ${statusHtml}
     ${syncErrorHtml}
@@ -532,6 +688,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
     ${itemsHtml}
   </div>
   ${weatherScript}
+  ${THEME_PICKER_SCRIPT}
 </body>
 </html>`;
 }
@@ -619,62 +776,69 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="120">
+${THEME_BOOTSTRAP_SCRIPT}
 <title>My Schedule - ${escapeHtml(personName)}</title>
 <style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
     padding: 16px;
-    background: #fafafa;
-    color: #1a1a1a;
+    background: var(--bg);
+    color: var(--text);
     max-width: 560px;
   }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   a.back {
     display: inline-block;
-    margin-bottom: 12px;
     font-size: 13px;
-    color: #333;
+    color: var(--text-dim);
     text-decoration: none;
   }
   a.back:hover { text-decoration: underline; }
   h1 { font-size: 20px; margin: 0 0 4px 0; }
-  .meta { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
   .entry { margin-bottom: 10px; }
-  .entry-date { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
+  .entry-date { font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 4px; }
   .entry-body {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 12px;
   }
-  .entry-line { font-size: 14px; }
-  .entry-notes { font-size: 12px; color: #555; font-style: italic; margin-top: 4px; }
-  .entry.today .entry-date { color: #26518f; }
-  .entry.today .entry-body { border: 2px solid #3f7fd1; }
+  .entry-line { font-size: 14px; color: #1a1a1a; }
+  .entry-notes { font-size: 12px; color: #444; font-style: italic; margin-top: 4px; }
+  .entry.today .entry-date { color: var(--accent); }
+  .entry.today .entry-body { border: 2px solid var(--accent); }
   .entry.past { opacity: 0.55; }
-  .empty { color: #666; font-size: 14px; padding: 16px; background: #fff; border: 1px solid #ddd; border-radius: 8px; }
+  .empty { color: var(--text-dim); font-size: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
   .past-toggle {
     display: block;
     width: 100%;
     font-size: 13px;
     font-family: inherit;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 8px 14px;
     margin-bottom: 14px;
     cursor: pointer;
-    color: #333;
+    color: var(--text);
   }
-  .past-toggle:hover { background: #f0f0f0; }
+  .past-toggle:hover { background: var(--surface-hover); }
   .past-entries { display: none; margin-bottom: 14px; }
   .past-entries.visible { display: block; }
 </style>
 </head>
 <body>
-  <a class="back" href="index.html">&larr; All schedules</a>
+  <div class="top-row">
+    <a class="back" href="index.html">&larr; All schedules</a>
+    ${THEME_PICKER_HTML}
+  </div>
   <h1>My Schedule</h1>
   <div class="meta">${escapeHtml(personName)} &middot; synced ${generatedAt} &middot; refreshes automatically every 2 minutes</div>
   ${itemsHtml}
+  ${THEME_PICKER_SCRIPT}
   <script>
     (function () {
       var btn = document.getElementById('pastToggle');
@@ -825,38 +989,42 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+${THEME_BOOTSTRAP_SCRIPT}
 <title>Annual Leave Tracker</title>
 <style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
     padding: 16px;
-    background: #fafafa;
-    color: #1a1a1a;
+    background: var(--bg);
+    color: var(--text);
   }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   a.back {
     display: inline-block;
-    margin-bottom: 12px;
     font-size: 13px;
-    color: #333;
+    color: var(--text-dim);
     text-decoration: none;
   }
   a.back:hover { text-decoration: underline; }
   h1 { font-size: 20px; margin: 0 0 4px 0; }
-  .meta { font-size: 13px; color: #666; margin-bottom: 16px; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
   .table-wrap {
     overflow-x: auto;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface);
   }
   table { border-collapse: collapse; min-width: 100%; }
   th, td {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     padding: 8px 10px;
     text-align: left;
     font-size: 13px;
     white-space: nowrap;
+    color: var(--text);
   }
   thead th {
     background: #333;
@@ -865,12 +1033,12 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
   .name-cell { font-weight: 600; }
   input.allowance-input { width: 60px; padding: 4px; font-size: 13px; }
   input.reset-input { padding: 4px; font-size: 13px; }
-  .reset-note { color: #888; font-size: 12px; }
+  .reset-note { color: var(--text-dim); font-size: 12px; }
   td.over { color: #c0392b; font-weight: 700; }
   td.low { color: #d18a1f; font-weight: 700; }
   .save-bar { margin-top: 16px; display: flex; align-items: center; gap: 12px; }
   button.save-btn {
-    background: #3f7fd1;
+    background: var(--accent);
     color: #fff;
     border: none;
     padding: 10px 18px;
@@ -878,27 +1046,27 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
     font-size: 14px;
     cursor: pointer;
   }
-  button.save-btn:hover { background: #2f6bb8; }
+  button.save-btn:hover { opacity: 0.9; }
   button.save-btn:disabled { background: #999; cursor: default; }
   .save-message { font-size: 13px; color: #2a7a2a; }
   .log-toggle-wrap { margin-top: 24px; }
   .log-toggle {
     font-size: 13px;
     font-family: inherit;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 8px 14px;
     cursor: pointer;
-    color: #333;
+    color: var(--text);
   }
-  .log-toggle:hover { background: #f0f0f0; }
+  .log-toggle:hover { background: var(--surface-hover); }
   .log-panel {
     display: none;
     margin-top: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface);
     max-height: 320px;
     overflow-y: auto;
   }
@@ -907,19 +1075,22 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
     display: flex;
     gap: 10px;
     padding: 8px 12px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border);
     font-size: 12px;
     flex-wrap: wrap;
   }
   .log-entry:last-child { border-bottom: none; }
-  .log-time { color: #888; min-width: 140px; }
+  .log-time { color: var(--text-dim); min-width: 140px; }
   .log-by { font-weight: 600; min-width: 110px; }
-  .log-desc { color: #333; }
-  .log-empty { padding: 14px; color: #888; font-size: 13px; }
+  .log-desc { color: var(--text); }
+  .log-empty { padding: 14px; color: var(--text-dim); font-size: 13px; }
 </style>
 </head>
 <body>
-  <a class="back" href="index.html">&larr; All schedules</a>
+  <div class="top-row">
+    <a class="back" href="index.html">&larr; All schedules</a>
+    ${THEME_PICKER_HTML}
+  </div>
   <h1>Annual Leave Tracker</h1>
   <div class="meta">Allowance and reset dates are editable here directly. "Used" counts A/L days since each person's most recent reset date.</div>
   <div class="table-wrap">
@@ -987,6 +1158,7 @@ function renderLeaveTracker(leaveData, rows, changeLog) {
       this.textContent = expanded ? '\u2191 Hide change log' : '\u2193 View change log';
     });
   </script>
+  ${THEME_PICKER_SCRIPT}
 </body>
 </html>`;
 }
@@ -1036,38 +1208,42 @@ function renderSickTracker(sickData, rows, changeLog) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+${THEME_BOOTSTRAP_SCRIPT}
 <title>Sick Days Tracker</title>
 <style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
     padding: 16px;
-    background: #fafafa;
-    color: #1a1a1a;
+    background: var(--bg);
+    color: var(--text);
   }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   a.back {
     display: inline-block;
-    margin-bottom: 12px;
     font-size: 13px;
-    color: #333;
+    color: var(--text-dim);
     text-decoration: none;
   }
   a.back:hover { text-decoration: underline; }
   h1 { font-size: 20px; margin: 0 0 4px 0; }
-  .meta { font-size: 13px; color: #666; margin-bottom: 16px; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
   .table-wrap {
     overflow-x: auto;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface);
   }
   table { border-collapse: collapse; min-width: 100%; }
   th, td {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     padding: 8px 10px;
     text-align: left;
     font-size: 13px;
     white-space: nowrap;
+    color: var(--text);
   }
   thead th {
     background: #333;
@@ -1076,12 +1252,12 @@ function renderSickTracker(sickData, rows, changeLog) {
   .name-cell { font-weight: 600; }
   input.allowance-input { width: 60px; padding: 4px; font-size: 13px; }
   input.reset-input { padding: 4px; font-size: 13px; }
-  .reset-note { color: #888; font-size: 12px; }
+  .reset-note { color: var(--text-dim); font-size: 12px; }
   td.over { color: #c0392b; font-weight: 700; }
   td.low { color: #d18a1f; font-weight: 700; }
   .save-bar { margin-top: 16px; display: flex; align-items: center; gap: 12px; }
   button.save-btn {
-    background: #3f7fd1;
+    background: var(--accent);
     color: #fff;
     border: none;
     padding: 10px 18px;
@@ -1089,27 +1265,27 @@ function renderSickTracker(sickData, rows, changeLog) {
     font-size: 14px;
     cursor: pointer;
   }
-  button.save-btn:hover { background: #2f6bb8; }
+  button.save-btn:hover { opacity: 0.9; }
   button.save-btn:disabled { background: #999; cursor: default; }
   .save-message { font-size: 13px; color: #2a7a2a; }
   .log-toggle-wrap { margin-top: 24px; }
   .log-toggle {
     font-size: 13px;
     font-family: inherit;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 8px 14px;
     cursor: pointer;
-    color: #333;
+    color: var(--text);
   }
-  .log-toggle:hover { background: #f0f0f0; }
+  .log-toggle:hover { background: var(--surface-hover); }
   .log-panel {
     display: none;
     margin-top: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface);
     max-height: 320px;
     overflow-y: auto;
   }
@@ -1118,19 +1294,22 @@ function renderSickTracker(sickData, rows, changeLog) {
     display: flex;
     gap: 10px;
     padding: 8px 12px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border);
     font-size: 12px;
     flex-wrap: wrap;
   }
   .log-entry:last-child { border-bottom: none; }
-  .log-time { color: #888; min-width: 140px; }
+  .log-time { color: var(--text-dim); min-width: 140px; }
   .log-by { font-weight: 600; min-width: 110px; }
-  .log-desc { color: #333; }
-  .log-empty { padding: 14px; color: #888; font-size: 13px; }
+  .log-desc { color: var(--text); }
+  .log-empty { padding: 14px; color: var(--text-dim); font-size: 13px; }
 </style>
 </head>
 <body>
-  <a class="back" href="index.html">&larr; All schedules</a>
+  <div class="top-row">
+    <a class="back" href="index.html">&larr; All schedules</a>
+    ${THEME_PICKER_HTML}
+  </div>
   <h1>Sick Days Tracker</h1>
   <div class="meta">Allowance and reset dates are editable here directly. "Used" counts Sick days since each person's most recent reset date.</div>
   <div class="table-wrap">
@@ -1198,6 +1377,7 @@ function renderSickTracker(sickData, rows, changeLog) {
       this.textContent = expanded ? '\u2191 Hide change log' : '\u2193 View change log';
     });
   </script>
+  ${THEME_PICKER_SCRIPT}
 </body>
 </html>`;
 }
