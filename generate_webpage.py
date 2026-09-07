@@ -606,7 +606,7 @@ def build_html(rows, page_title, back_link=None) -> str:
         for person in people:
             entries = grid.get((current, person), [])
             if not entries and is_weekend:
-                colour = "#eaeaea"
+                colour = "var(--surface-hover)"
             else:
                 colour = "transparent"
             style = f' style="background:{colour}"' if colour != "transparent" else ""
