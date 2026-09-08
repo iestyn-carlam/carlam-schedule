@@ -656,6 +656,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
 
   if (email && EMAIL_TO_NAME[email]) {
     myScheduleLinks.push(["My Schedule", "my-schedule", "Just your own tasks, day by day"]);
+    myScheduleLinks.push(["My Annual Leave", "my-annual-leave", "Days used, remaining, and your reset date"]);
     myScheduleLinks.push(["Request Annual Leave", "request-leave", "Submit a new leave request"]);
     myScheduleLinks.push(["My Leave Requests", "my-leave-requests", "Track the status of your requests"]);
   }
@@ -1103,6 +1104,101 @@ function formatLogTime(isoString) {
   } catch (err) {
     return isoString;
   }
+}
+
+function renderMyAnnualLeave(personName, allowance, resetDate, sinceISO, usedDays, takenRows) {
+  const remaining = allowance - usedDays;
+  const remainingClass = remaining < 0 ? "over" : remaining <= 3 ? "low" : "";
+
+  const sortedTaken = [...takenRows].sort((a, b) => (a.start_date < b.start_date ? 1 : -1));
+  const datesHtml = sortedTaken.length
+    ? sortedTaken
+        .map((r) => {
+          const d = new Date(r.start_date + "T00:00:00");
+          const label = d.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+          const halfTag = r.status === "A/L (Half Day)" ? " (half day)" : "";
+          return `<div class="taken-row"><span class="taken-date">${escapeHtml(label)}</span><span class="taken-tag">${escapeHtml(r.status)}${escapeHtml(halfTag)}</span></div>`;
+        })
+        .join("")
+    : `<div class="empty">No annual leave taken since your last reset.</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>My Annual Leave</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 480px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .summary-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+  .summary-value { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; margin-top: 4px; }
+  .summary-value.over { color: #e05a5a; }
+  .summary-value.low { color: #e0a938; }
+  .reset-note { font-size: 12px; color: var(--text-dim); margin-bottom: 20px; }
+  .section-title { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+  .taken-list { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .taken-row { display: flex; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .taken-row:last-child { border-bottom: none; }
+  .taken-tag { color: var(--text-dim); }
+  .empty { color: var(--text-dim); font-size: 13px; padding: 14px; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>My Annual Leave</h1>
+  <div class="meta">${escapeHtml(personName)} &middot; view only</div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="summary-label">Allowance</div>
+      <div class="summary-value">${allowance}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Used</div>
+      <div class="summary-value">${usedDays}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Remaining</div>
+      <div class="summary-value ${remainingClass}">${remaining}</div>
+    </div>
+  </div>
+  <div class="reset-note">${sinceISO ? `Counted since your last reset on ${escapeHtml(sinceISO)}${resetDate ? ` (resets annually on ${escapeHtml(resetDate)})` : ""}` : "No reset date has been set for you yet - check with Iestyn."}</div>
+
+  <div class="section-title">Days taken</div>
+  <div class="taken-list">${datesHtml}</div>
+
+  ${THEME_PICKER_SCRIPT}
+</body>
+</html>`;
 }
 
 function renderLeaveTracker(leaveData, rows, changeLog) {
@@ -2119,6 +2215,59 @@ export default {
       const name = email ? EMAIL_TO_NAME[email] || null : null;
       return new Response(JSON.stringify({ name, email: email || null }), {
         headers: { "content-type": "application/json" },
+      });
+    }
+
+    if (url.pathname === "/my-annual-leave") {
+      const email = decodeAccessEmail(request);
+      const personName = email ? EMAIL_TO_NAME[email] : null;
+
+      if (!personName) {
+        return new Response("Your account isn't linked to a name yet. Check with Iestyn.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let saved = {};
+      try {
+        if (env.LEAVE_KV) {
+          const stored = await env.LEAVE_KV.get(LEAVE_KV_KEY);
+          const leaveData = stored ? JSON.parse(stored) : {};
+          saved = leaveData[personName] || {};
+        }
+      } catch (err) {
+        console.error("Failed to read leave allowance for /my-annual-leave:", err);
+      }
+
+      const allowance = typeof saved.allowance === "number" ? saved.allowance : DEFAULT_ALLOWANCE;
+      const resetDate = saved.resetDate || "";
+      const mostRecent = mostRecentResetDate(resetDate, today);
+      const sinceISO = mostRecent ? toISODateString(mostRecent) : null;
+
+      let rows = [];
+      try {
+        const dataResp = await env.ASSETS.fetch(new URL("/schedule-data.json", request.url));
+        if (dataResp.ok) rows = await dataResp.json();
+      } catch (err) {
+        console.error("Failed to load schedule data for /my-annual-leave:", err);
+      }
+
+      const usedDays = countUsedALDays(personName, rows, sinceISO);
+      const takenRows = rows.filter(
+        (r) =>
+          Array.isArray(r.people) &&
+          r.people.includes(personName) &&
+          (r.status === "A/L" || r.status === "A/L (Half Day)") &&
+          r.start_date &&
+          (!sinceISO || r.start_date >= sinceISO)
+      );
+
+      return new Response(renderMyAnnualLeave(personName, allowance, resetDate, sinceISO, usedDays, takenRows), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
 
