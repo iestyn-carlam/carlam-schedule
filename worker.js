@@ -1077,6 +1077,10 @@ ${THEME_BOOTSTRAP_SCRIPT}
   <div class="page">
     <div class="logo-wrap"><img class="logo" src="/carlam-logo.png" alt="Carlam"></div>
     <h1>Schedules</h1>
+    ${statusHtml}
+    ${syncErrorHtml}
+    ${incidentHtml}
+    ${widgetsHtml}
 
     ${itemsHtml}
   </div>
