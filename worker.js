@@ -883,6 +883,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
 
   if (email === "iestyn@carlamltd.com") {
     trackerLinks.push(["Analytics", "analytics", "Traffic, usage, and system stats - just for you"]);
+  }
 
   if (entry === "ALL") {
     masterLinks.unshift(["All Teams (Master)", MASTER_FILE, "Everyone, every team, in one grid"]);
