@@ -487,6 +487,38 @@ const PAGE_STYLE = `
     padding: 8px 14px;
     border-radius: 8px;
   }
+  .incident-banner {
+    max-width: 420px;
+    margin: 0 auto 24px;
+    background: rgba(241, 196, 15, 0.1);
+    border: 1px solid rgba(241, 196, 15, 0.4);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-align: left;
+  }
+  .incident-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #f1c40f;
+    margin-bottom: 4px;
+  }
+  .incident-detail {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .incident-update {
+    font-size: 12px;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .incident-link {
+    font-size: 12px;
+    color: #f1c40f;
+    text-decoration: none;
+  }
+  .incident-link:hover { text-decoration: underline; }
   .widgets {
     display: flex;
     justify-content: center;
@@ -646,7 +678,188 @@ const PAGE_STYLE = `
   }
 `;
 
-function renderIndex(email, syncedAt, headlines, syncedAtIso) {
+function barHtml(label, value, max, suffix) {
+  const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
+  return `<div class="bar-row">
+    <div class="bar-label">${escapeHtml(label)}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+    <div class="bar-value">${escapeHtml(String(value))}${suffix ? escapeHtml(suffix) : ""}</div>
+  </div>`;
+}
+
+function renderAnalytics(pageviews, requests, scheduleRows, syncedAt) {
+  const total = pageviews.total || 0;
+  const byPath = pageviews.byPath || {};
+  const byDay = pageviews.byDay || {};
+  const recent = pageviews.recent || [];
+
+  const topPaths = Object.entries(byPath)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+  const maxPathViews = topPaths.length ? topPaths[0][1] : 1;
+
+  const today = new Date();
+  const last7 = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    last7.push({ key, label: d.toLocaleDateString("en-GB", { weekday: "short" }), count: byDay[key] || 0 });
+  }
+  const maxDayViews = Math.max(1, ...last7.map((d) => d.count));
+  const viewsToday = byDay[today.toISOString().slice(0, 10)] || 0;
+  const viewsThisWeek = last7.reduce((sum, d) => sum + d.count, 0);
+
+  const uniqueVisitorNames = new Set(recent.filter((r) => r.name).map((r) => r.name));
+
+  const totalRequests = requests.length;
+  const accepted = requests.filter((r) => r.status === "accepted").length;
+  const rejected = requests.filter((r) => r.status === "rejected").length;
+  const pending = requests.filter((r) => r.status === "pending").length;
+  const decided = requests.filter((r) => r.decidedAt && r.submittedAt);
+  const avgTurnaroundHrs = decided.length
+    ? (
+        decided.reduce((sum, r) => sum + (new Date(r.decidedAt) - new Date(r.submittedAt)), 0) /
+        decided.length /
+        (1000 * 60 * 60)
+      ).toFixed(1)
+    : null;
+
+  const statusCounts = {};
+  const teamCounts = {};
+  const programmeCounts = {};
+  const personCounts = {};
+  for (const r of scheduleRows) {
+    if (r.status) statusCounts[r.status] = (statusCounts[r.status] || 0) + 1;
+    if (r.team) teamCounts[r.team] = (teamCounts[r.team] || 0) + 1;
+    if (r.programme) programmeCounts[r.programme] = (programmeCounts[r.programme] || 0) + 1;
+    for (const p of r.people || []) personCounts[p] = (personCounts[p] || 0) + 1;
+  }
+  const topStatuses = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const topProgrammes = Object.entries(programmeCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const topPeople = Object.entries(personCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const maxStatus = topStatuses.length ? topStatuses[0][1] : 1;
+  const maxProgramme = topProgrammes.length ? topProgrammes[0][1] : 1;
+  const maxPerson = topPeople.length ? topPeople[0][1] : 1;
+
+  const recentHtml = recent.slice(0, 15).map(
+    (r) => `<div class="recent-row">
+      <span class="recent-time">${escapeHtml(formatLogTime(r.time))}</span>
+      <span class="recent-name">${escapeHtml(r.name || "Unknown")}</span>
+      <span class="recent-path">${escapeHtml(r.path)}</span>
+    </div>`
+  ).join("");
+
+  const dayBarsHtml = last7
+    .map((d) => {
+      const h = Math.max(4, Math.round((d.count / maxDayViews) * 80));
+      return `<div class="daybar"><div class="daybar-fill" style="height:${h}px" title="${d.count} views"></div><div class="daybar-label">${escapeHtml(d.label)}</div></div>`;
+    })
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>Analytics</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 900px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 24px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 28px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+  .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-value { font-size: 24px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; margin-top: 4px; }
+  .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .panel-title { font-size: 13px; font-weight: 600; margin: 0 0 12px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .bar-label { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { background: var(--surface-hover); border-radius: 4px; height: 10px; overflow: hidden; }
+  .bar-fill { background: var(--accent); height: 100%; border-radius: 4px; }
+  .bar-value { text-align: right; color: var(--text); }
+  .daychart { display: flex; align-items: flex-end; gap: 10px; height: 100px; padding-top: 10px; }
+  .daybar { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+  .daybar-fill { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; }
+  .daybar-label { font-size: 10px; color: var(--text-dim); }
+  .recent-row { display: flex; gap: 10px; font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .recent-row:last-child { border-bottom: none; }
+  .recent-time { color: var(--text-dim); min-width: 130px; }
+  .recent-name { font-weight: 600; min-width: 100px; }
+  .recent-path { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .empty { color: var(--text-dim); font-size: 13px; padding: 10px 0; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Analytics</h1>
+  <div class="meta">Everything the system has tracked about itself &middot; schedule last synced ${escapeHtml(syncedAt || "unknown")}</div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Total Page Views</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Views Today</div><div class="stat-value">${viewsToday}</div></div>
+    <div class="stat-card"><div class="stat-label">Views This Week</div><div class="stat-value">${viewsThisWeek}</div></div>
+    <div class="stat-card"><div class="stat-label">Recent Unique Visitors</div><div class="stat-value">${uniqueVisitorNames.size}</div></div>
+    <div class="stat-card"><div class="stat-label">Schedule Rows</div><div class="stat-value">${scheduleRows.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Leave Requests</div><div class="stat-value">${totalRequests}</div></div>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Views over the last 7 days</div>
+      <div class="daychart">${dayBarsHtml}</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Most visited pages</div>
+      ${topPaths.length ? topPaths.map(([path, count]) => barHtml(path, count, maxPathViews)).join("") : '<div class="empty">No data yet.</div>'}
+    </div>
+    <div class="panel">
+      <div class="panel-title">Leave requests</div>
+      <div class="bar-row"><div class="bar-label">Accepted</div><div class="bar-track"><div class="bar-fill" style="width:${totalRequests ? (accepted / totalRequests) * 100 : 0}%;background:#2a9d4a"></div></div><div class="bar-value">${accepted}</div></div>
+      <div class="bar-row"><div class="bar-label">Rejected</div><div class="bar-track"><div class="bar-fill" style="width:${totalRequests ? (rejected / totalRequests) * 100 : 0}%;background:#c0392b"></div></div><div class="bar-value">${rejected}</div></div>
+      <div class="bar-row"><div class="bar-label">Pending</div><div class="bar-track"><div class="bar-fill" style="width:${totalRequests ? (pending / totalRequests) * 100 : 0}%;background:#d18a1f"></div></div><div class="bar-value">${pending}</div></div>
+      ${avgTurnaroundHrs !== null ? `<div class="empty" style="padding-top:8px;">Average decision time: ${escapeHtml(avgTurnaroundHrs)} hours</div>` : ""}
+    </div>
+    <div class="panel">
+      <div class="panel-title">Schedule by status</div>
+      ${topStatuses.length ? topStatuses.map(([s, c]) => barHtml(s, c, maxStatus)).join("") : '<div class="empty">No data yet.</div>'}
+    </div>
+    <div class="panel">
+      <div class="panel-title">Busiest programmes</div>
+      ${topProgrammes.length ? topProgrammes.map(([p, c]) => barHtml(p, c, maxProgramme)).join("") : '<div class="empty">No data yet.</div>'}
+    </div>
+    <div class="panel">
+      <div class="panel-title">Most scheduled people</div>
+      ${topPeople.length ? topPeople.map(([p, c]) => barHtml(p, c, maxPerson)).join("") : '<div class="empty">No data yet.</div>'}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Recent activity</div>
+    ${recentHtml || '<div class="empty">No activity recorded yet.</div>'}
+  </div>
+
+  ${THEME_PICKER_SCRIPT}
+</body>
+</html>`;
+}
+
+function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
   const entry = email ? ACCESS_MAP[email] : undefined;
 
   const myScheduleLinks = [];
@@ -667,6 +880,9 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
     trackerLinks.push(["Sick Days Tracker", SICK_TRACKER_PATH.slice(1), "Set allowances and see sick days used"]);
     trackerLinks.push(["Approve Leave Requests", "approve-leave", "Review and decide on pending requests"]);
   }
+
+  if (email === "iestyn@carlamltd.com") {
+    trackerLinks.push(["Analytics", "analytics", "Traffic, usage, and system stats - just for you"]);
 
   if (entry === "ALL") {
     masterLinks.unshift(["All Teams (Master)", MASTER_FILE, "Everyone, every team, in one grid"]);
@@ -713,6 +929,15 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso) {
     : `<div class="status"><span class="dot" id="syncDot"></span>live</div>`;
 
   const syncErrorHtml = `<div class="sync-error" id="syncError">Hasn't updated in a while &mdash; try refreshing the page. Still stale after that? Contact the admin (Iestyn).</div>`;
+
+  const incidentHtml = incidentInfo
+    ? `<div class="incident-banner">
+        <div class="incident-title">&#9888;&#65039; Cloudflare is experiencing issues &mdash; automatic syncing may be temporarily delayed.</div>
+        <div class="incident-detail">${escapeHtml(incidentInfo.name)} &middot; ${escapeHtml(incidentInfo.statusLabel)}</div>
+        <div class="incident-update">${escapeHtml(incidentInfo.latestUpdate)}</div>
+        <a class="incident-link" href="${escapeHtml(incidentInfo.url)}" target="_blank" rel="noopener">View live status on Cloudflare's status page &rarr;</a>
+      </div>`
+    : "";
 
   const headlinesHtml = (headlines && headlines.length)
     ? headlines
@@ -851,9 +1076,7 @@ ${THEME_BOOTSTRAP_SCRIPT}
   <div class="page">
     <div class="logo-wrap"><img class="logo" src="/carlam-logo.png" alt="Carlam"></div>
     <h1>Schedules</h1>
-    ${statusHtml}
-    ${syncErrorHtml}
-    ${widgetsHtml}
+
     ${itemsHtml}
   </div>
   ${weatherScript}
@@ -1036,6 +1259,78 @@ ${THEME_PICKER_CSS}
 
 const LEAVE_TRACKER_PATH = "/annual-leave-tracker";
 const LEAVE_KV_KEY = "leave-allowances";
+const PAGEVIEW_KV_KEY = "analytics-pageviews";
+
+// The specific incident this banner tracks - see
+// https://www.cloudflarestatus.com/incidents/sjs8s0q2x4hw (Workers Cron
+// Triggers degraded). Checked live against Cloudflare's own status API on
+// every homepage load, so the banner disappears on its own once Cloudflare
+// actually resolves it - nothing to manually remove later.
+const TRACKED_INCIDENT_ID = "sjs8s0q2x4hw";
+
+async function fetchCloudflareIncidentStatus() {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const resp = await fetch("https://www.cloudflarestatus.com/api/v2/incidents/unresolved.json", {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!resp.ok) return null;
+
+    const data = await resp.json();
+    const incident = (data.incidents || []).find((i) => i.id === TRACKED_INCIDENT_ID);
+    if (!incident) return null;
+
+    const statusLabels = {
+      investigating: "Investigating",
+      identified: "Identified \u2013 fix in progress",
+      monitoring: "Monitoring the fix",
+    };
+    const latestUpdate =
+      incident.incident_updates && incident.incident_updates[0] ? incident.incident_updates[0].body : "";
+
+    return {
+      name: incident.name,
+      statusLabel: statusLabels[incident.status] || incident.status,
+      latestUpdate,
+      url: incident.shortlink || `https://www.cloudflarestatus.com/incidents/${incident.id}`,
+    };
+  } catch (err) {
+    console.error("Failed to fetch Cloudflare incident status:", err);
+    return null;
+  }
+}
+
+async function trackPageView(env, pathname, viewerName) {
+  if (!env.LEAVE_KV) return;
+  try {
+    const stored = await env.LEAVE_KV.get(PAGEVIEW_KV_KEY);
+    const data = stored ? JSON.parse(stored) : { total: 0, byPath: {}, byDay: {}, recent: [] };
+
+    data.total = (data.total || 0) + 1;
+    data.byPath = data.byPath || {};
+    data.byPath[pathname] = (data.byPath[pathname] || 0) + 1;
+
+    const today = new Date().toISOString().slice(0, 10);
+    data.byDay = data.byDay || {};
+    data.byDay[today] = (data.byDay[today] || 0) + 1;
+    // Keep roughly the last 60 days of daily buckets, no need to grow forever.
+    const dayKeys = Object.keys(data.byDay).sort();
+    if (dayKeys.length > 60) {
+      for (const oldKey of dayKeys.slice(0, dayKeys.length - 60)) delete data.byDay[oldKey];
+    }
+
+    data.recent = data.recent || [];
+    data.recent.unshift({ path: pathname, name: viewerName, time: new Date().toISOString() });
+    data.recent = data.recent.slice(0, 60);
+
+    await env.LEAVE_KV.put(PAGEVIEW_KV_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.error("Failed to track page view:", err);
+  }
+}
+
 const LEAVE_LOG_KEY = "leave-changelog";
 const DEFAULT_ALLOWANCE = 25;
 
@@ -2210,11 +2505,67 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    // Track this as a page view - runs for every single request (dynamic
+    // Worker routes and static schedule pages alike, since both pass
+    // through this same handler), but skipped for data/asset files that
+    // aren't really "pages" a person is browsing, and never blocks the
+    // actual response.
+    if (
+      request.method === "GET" &&
+      !url.pathname.match(/\.(json|ics|png|xlsx|jpg|svg|ico)$/)
+    ) {
+      const viewerEmail = decodeAccessEmail(request);
+      const viewerName = viewerEmail ? EMAIL_TO_NAME[viewerEmail] || null : null;
+      ctx.waitUntil(trackPageView(env, url.pathname, viewerName));
+    }
+
     if (url.pathname === "/whoami") {
       const email = decodeAccessEmail(request);
       const name = email ? EMAIL_TO_NAME[email] || null : null;
       return new Response(JSON.stringify({ name, email: email || null }), {
         headers: { "content-type": "application/json" },
+      });
+    }
+
+    if (url.pathname === "/analytics") {
+      const email = decodeAccessEmail(request);
+      if (email !== "iestyn@carlamltd.com") {
+        return new Response("Not authorised.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      let pageviews = { total: 0, byPath: {}, byDay: {}, recent: [] };
+      let requests = [];
+      let scheduleRows = [];
+      let syncedAt = null;
+
+      try {
+        if (env.LEAVE_KV) {
+          const stored = await env.LEAVE_KV.get(PAGEVIEW_KV_KEY);
+          if (stored) pageviews = JSON.parse(stored);
+          const storedRequests = await env.LEAVE_KV.get(REQUEST_KV_KEY);
+          if (storedRequests) requests = JSON.parse(storedRequests);
+        }
+      } catch (err) {
+        console.error("Failed to load analytics KV data:", err);
+      }
+
+      try {
+        const dataResp = await env.ASSETS.fetch(new URL("/schedule-data.json", request.url));
+        if (dataResp.ok) scheduleRows = await dataResp.json();
+        const syncResp = await env.ASSETS.fetch(new URL("/last-sync.json", request.url));
+        if (syncResp.ok) {
+          const syncData = await syncResp.json();
+          syncedAt = syncData.synced_at || null;
+        }
+      } catch (err) {
+        console.error("Failed to load schedule data for analytics:", err);
+      }
+
+      return new Response(renderAnalytics(pageviews, requests, scheduleRows, syncedAt), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
 
@@ -2288,8 +2639,9 @@ export default {
       }
 
       const headlines = [];
+      const incidentInfo = await fetchCloudflareIncidentStatus();
 
-      return new Response(renderIndex(email, syncedAt, headlines, syncedAtIso), {
+      return new Response(renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
