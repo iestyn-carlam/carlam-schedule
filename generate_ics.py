@@ -25,10 +25,10 @@ import requests
 # without needing multi-select tagging. Keep this in step with the actual
 # options on the "Person Name" select field in Notion.
 ALL_STAFF = [
-    "Iestyn O'Leary", "Bethan Evans", "Ceri Siggins", "Cerys Pinkman",
-    "Derwena Burt", "Elin Jones", "Euros Llyr Morgan",
-    "Jason Lye-Phillips", "Lara Hughes", "Osian Lewis", "Owain Jones",
-    "Rhodri Lewis", "Wil Williams",
+    "Iestyn O'Leary", "Bethan Evans", "Ceri Siggins", "Cerys Pinkman", 
+    "Derwena Burt", "Elin Jones", "Euros Llyr Morgan", "Jason Lye-Phillips", 
+    "Lara Hughes", "Osian Lewis", "Owain Jones", "Rhodri Lewis", 
+    "Wil Williams", "Dan Rees"
 ]
 
 # A private, unguessable suffix mixed into every filename, so links can't be
