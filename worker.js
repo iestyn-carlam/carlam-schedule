@@ -75,6 +75,31 @@ const EMAIL_TO_NAME = {
   "wil@carlamltd.com": "Wil Williams",
 };
 
+// Unlike every other team page, Scripted isn't gated by a fixed list of
+// people in ACCESS_MAP - it should only be visible to people with "ALL"
+// access (iestyn, bethan, derwena, elin, eurosllyr, lara) plus whoever
+// currently has a Scripted-team task assigned to them in Notion, which
+// changes over time. So this checks live schedule-data.json instead of a
+// static list, meaning nobody has to remember to edit this file (or a
+// Cloudflare Access policy) whenever scripted assignments change.
+async function isScriptedAuthorized(email, env, request) {
+  if (!email) return false;
+  if (ACCESS_MAP[email] === "ALL") return true;
+  const personName = EMAIL_TO_NAME[email];
+  if (!personName) return false;
+  try {
+    const dataResp = await env.ASSETS.fetch(new URL("/schedule-data.json", request.url));
+    if (!dataResp.ok) return false;
+    const rows = await dataResp.json();
+    return rows.some(
+      (r) => r.team === "Scripted" && Array.isArray(r.people) && r.people.includes(personName)
+    );
+  } catch (err) {
+    console.error("Failed to check Scripted-task access:", err);
+    return false;
+  }
+}
+
 function decodeAccessEmail(request) {
   const jwt = request.headers.get("Cf-Access-Jwt-Assertion");
   if (!jwt) return null;
@@ -864,7 +889,7 @@ ${THEME_PICKER_CSS}
 </html>`;
 }
 
-function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
+function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo, scriptedAuthorized) {
   const entry = email ? ACCESS_MAP[email] : undefined;
 
   const myScheduleLinks = [];
@@ -901,6 +926,14 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
         teamLinks.push([team, TEAM_PAGES[team], `${team} team schedule`]);
       }
     }
+  }
+
+  // Scripted isn't part of the static ACCESS_MAP team lists above (see
+  // isScriptedAuthorized) - added separately here so it shows up for
+  // anyone currently assigned a Scripted-team task, even if they have no
+  // other team access at all.
+  if (entry !== "ALL" && scriptedAuthorized && TEAM_PAGES.Scripted) {
+    teamLinks.push(["Scripted", TEAM_PAGES.Scripted, "Scripted team schedule"]);
   }
 
   function renderLinkGroup(title, groupLinks) {
@@ -2650,10 +2683,12 @@ export default {
 
       const headlines = [];
       const incidentInfo = await fetchCloudflareIncidentStatus();
+      const scriptedAuthorized = await isScriptedAuthorized(email, env, request);
 
-      return new Response(renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo), {
-        headers: { "content-type": "text/html; charset=UTF-8" },
-      });
+      return new Response(
+        renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo, scriptedAuthorized),
+        { headers: { "content-type": "text/html; charset=UTF-8" } }
+      );
     }
 
     if (url.pathname === "/my-schedule") {
@@ -3102,6 +3137,23 @@ export default {
       return new Response(renderApprovalsPage(requests, null), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
+    }
+
+    // Real enforcement for the Scripted page: unlike the other team pages,
+    // who can see this one changes as Notion assignments change, so it
+    // can't be locked down with a fixed Cloudflare Access policy the way
+    // the others are. Its Cloudflare Access policy just needs to admit any
+    // authenticated Carlam staff member; this check does the actual
+    // per-person gating on every request.
+    if (TEAM_PAGES.Scripted && url.pathname === "/" + TEAM_PAGES.Scripted) {
+      const email = decodeAccessEmail(request);
+      const authorized = await isScriptedAuthorized(email, env, request);
+      if (!authorized) {
+        return new Response(
+          "Not authorised. This schedule is only visible to people currently assigned a Scripted task.",
+          { status: 403, headers: { "content-type": "text/plain; charset=UTF-8" } }
+        );
+      }
     }
 
     return env.ASSETS.fetch(request);
