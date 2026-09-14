@@ -21,6 +21,11 @@ const TEAM_PAGES = {
   Technical: "schedule-technical-62ca0dbf.html",
   Admin: "schedule-admin-578fa55d.html",
   Factual: "schedule-factual-6b97711e.html",
+  // TODO: once the sync workflow has run on main with "Scripted" added to
+  // generate_webpage.py's TEAMS, replace this with the real generated
+  // filename (docs/schedule-scripted-<hash>.html) and add a matching
+  // Cloudflare Access policy for that path - see the file header comment.
+  Scripted: "schedule-scripted-PLACEHOLDER.html",
 };
 const MASTER_FILE = "schedule-master-6bc54781.html";
 
