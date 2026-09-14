@@ -30,10 +30,10 @@ import requests
 # The full staff roster, used to expand a "Everyone" tag on a row into every
 # individual person. Keep in step with the "Person Name" select options.
 ALL_STAFF = [
-    "Iestyn O'Leary", "Bethan Evans", "Ceri Siggins", "Cerys Pinkman",
-    "Derwena Burt", "Elin Jones", "Euros Llyr Morgan",
-    "Jason Lye-Phillips", "Lara Hughes", "Osian Lewis", "Owain Jones",
-    "Rhodri Lewis", "Wil Williams",
+    "Iestyn O'Leary", "Bethan Evans", "Ceri Siggins", "Cerys Pinkman", 
+    "Derwena Burt", "Elin Jones", "Euros Llyr Morgan", "Jason Lye-Phillips", 
+    "Lara Hughes", "Osian Lewis", "Owain Jones", "Rhodri Lewis", 
+    "Wil Williams", "Dan Rees"
 ]
 
 FILENAME_SALT = os.environ.get("FILENAME_SALT")
