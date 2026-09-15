@@ -2644,22 +2644,54 @@ async function saveVanPhotos(env, logId, photos) {
   return keys;
 }
 
-function renderBookVanForm(personName, bookings) {
+// Shared little client script for the delete button on booking cards -
+// used on both /book-van and /van-calendar, since both list bookings.
+const VAN_DELETE_SCRIPT = `<script>
+  function deleteVanBooking(id) {
+    if (!confirm('Delete this booking?')) return;
+    fetch('/book-van', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id: id }),
+    })
+      .then(function (resp) { return resp.json().then(function (data) { return { resp: resp, data: data }; }); })
+      .then(function (result) {
+        if (result.resp.ok) {
+          location.reload();
+        } else {
+          alert(result.data.error || 'Could not delete this booking.');
+        }
+      })
+      .catch(function () {
+        alert('Could not delete - check your connection.');
+      });
+  }
+</script>`;
+
+// A delete button shows up when the viewer either made the booking
+// themselves, or is one of the three admins - same group that runs the
+// leave trackers and van logs.
+function renderVanBookingCard(b, email) {
+  const canDelete = !!email && (email === b.bookedByEmail || ANNUAL_LEAVE_VIEWERS.has(email));
+  const deleteBtn = canDelete
+    ? `<button type="button" class="van-delete-btn" onclick="deleteVanBooking('${escapeHtml(b.id)}')">Delete</button>`
+    : "";
+  return `<div class="van-booking-card">
+            <div class="van-booking-when">${escapeHtml(formatVanDateTime(b.startDateTime))} &rarr; ${escapeHtml(formatVanDateTime(b.endDateTime))}</div>
+            <div class="van-booking-who">${escapeHtml(b.driverName)} &middot; ${escapeHtml(b.project)}</div>
+            <div class="van-booking-where">${escapeHtml(b.destination)}</div>
+            ${deleteBtn}
+          </div>`;
+}
+
+function renderBookVanForm(personName, bookings, email) {
   const nowStr = new Date().toISOString().slice(0, 16);
   const upcoming = bookings
     .filter((b) => b.endDateTime >= nowStr)
     .sort((a, b) => (a.startDateTime < b.startDateTime ? -1 : 1));
 
   const upcomingHtml = upcoming.length
-    ? upcoming
-        .map(
-          (b) => `<div class="van-booking-card">
-            <div class="van-booking-when">${escapeHtml(formatVanDateTime(b.startDateTime))} &rarr; ${escapeHtml(formatVanDateTime(b.endDateTime))}</div>
-            <div class="van-booking-who">${escapeHtml(b.driverName)} &middot; ${escapeHtml(b.project)}</div>
-            <div class="van-booking-where">${escapeHtml(b.destination)}</div>
-          </div>`
-        )
-        .join("")
+    ? upcoming.map((b) => renderVanBookingCard(b, email)).join("")
     : `<div class="empty">No upcoming bookings - the van is free.</div>`;
 
   return `<!DOCTYPE html>
@@ -2689,6 +2721,8 @@ ${THEME_PICKER_CSS}
   .van-booking-when { font-weight: 600; }
   .van-booking-who { color: var(--text-dim); margin-top: 2px; }
   .van-booking-where { color: var(--text-dim); margin-top: 2px; }
+  .van-delete-btn { margin-top: 8px; background: none; border: 1px solid #c0392b; color: #c0392b; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .van-delete-btn:hover { background: #c0392b; color: #fff; }
   .empty { color: var(--text-dim); font-size: 13px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
   label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
   input[type="text"], input[type="datetime-local"], textarea {
@@ -2755,6 +2789,7 @@ ${THEME_PICKER_CSS}
   </form>
 
   ${THEME_PICKER_SCRIPT}
+  ${VAN_DELETE_SCRIPT}
   <script>
     (function () {
       var startInput = document.getElementById('startDateTime');
@@ -2804,7 +2839,7 @@ ${THEME_PICKER_CSS}
 </html>`;
 }
 
-function renderVanCalendar(bookings, monthParam) {
+function renderVanCalendar(bookings, monthParam, email) {
   const now = new Date();
   let year = now.getUTCFullYear();
   let month = now.getUTCMonth(); // 0-indexed
@@ -2863,15 +2898,7 @@ function renderVanCalendar(bookings, monthParam) {
     .filter((b) => b.endDateTime >= nowStr)
     .sort((a, b) => (a.startDateTime < b.startDateTime ? -1 : 1));
   const listHtml = upcoming.length
-    ? upcoming
-        .map(
-          (b) => `<div class="van-booking-card">
-            <div class="van-booking-when">${escapeHtml(formatVanDateTime(b.startDateTime))} &rarr; ${escapeHtml(formatVanDateTime(b.endDateTime))}</div>
-            <div class="van-booking-who">${escapeHtml(b.driverName)} &middot; ${escapeHtml(b.project)}</div>
-            <div class="van-booking-where">${escapeHtml(b.destination)}</div>
-          </div>`
-        )
-        .join("")
+    ? upcoming.map((b) => renderVanBookingCard(b, email)).join("")
     : `<div class="empty">No upcoming bookings - the van is free.</div>`;
 
   return `<!DOCTYPE html>
@@ -2913,6 +2940,8 @@ ${THEME_PICKER_CSS}
   .van-booking-when { font-weight: 600; }
   .van-booking-who { color: var(--text-dim); margin-top: 2px; }
   .van-booking-where { color: var(--text-dim); margin-top: 2px; }
+  .van-delete-btn { margin-top: 8px; background: none; border: 1px solid #c0392b; color: #c0392b; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .van-delete-btn:hover { background: #c0392b; color: #fff; }
   .empty { color: var(--text-dim); font-size: 13px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 </style>
 </head>
@@ -2937,6 +2966,7 @@ ${THEME_PICKER_CSS}
   ${listHtml}
 
   ${THEME_PICKER_SCRIPT}
+  ${VAN_DELETE_SCRIPT}
 </body>
 </html>`;
 }
@@ -3854,6 +3884,23 @@ export default {
           return new Response(JSON.stringify({ error: "Invalid data." }), { status: 400, headers: { "content-type": "application/json" } });
         }
 
+        if (body.action === "delete") {
+          const id = typeof body.id === "string" ? body.id : "";
+          const bookings = await getVanBookings(env);
+          const idx = bookings.findIndex((b) => b.id === id);
+          if (idx === -1) {
+            return new Response(JSON.stringify({ error: "Booking not found - it may already have been deleted." }), { status: 404, headers: { "content-type": "application/json" } });
+          }
+          const target = bookings[idx];
+          const canDelete = email === target.bookedByEmail || ANNUAL_LEAVE_VIEWERS.has(email);
+          if (!canDelete) {
+            return new Response(JSON.stringify({ error: "You can only delete your own bookings." }), { status: 403, headers: { "content-type": "application/json" } });
+          }
+          bookings.splice(idx, 1);
+          await saveVanBookings(env, bookings);
+          return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+        }
+
         const driverName = typeof body.driverName === "string" ? body.driverName.trim() : "";
         const project = typeof body.project === "string" ? body.project.trim() : "";
         const destination = typeof body.destination === "string" ? body.destination.trim() : "";
@@ -3903,7 +3950,7 @@ export default {
       }
 
       const bookings = await getVanBookings(env);
-      return new Response(renderBookVanForm(personName, bookings), {
+      return new Response(renderBookVanForm(personName, bookings, email), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
@@ -3915,7 +3962,7 @@ export default {
       }
       const bookings = env.LEAVE_KV ? await getVanBookings(env) : [];
       const monthParam = url.searchParams.get("month") || "";
-      return new Response(renderVanCalendar(bookings, monthParam), {
+      return new Response(renderVanCalendar(bookings, monthParam, email), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
