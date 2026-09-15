@@ -868,6 +868,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
   const masterLinks = [];
   const trackerLinks = [];
   const teamLinks = [];
+  const vanLinks = [];
 
   if (email && EMAIL_TO_NAME[email]) {
     myScheduleLinks.push(["My Schedule", "my-schedule", "Just your own tasks, day by day"]);
@@ -881,10 +882,20 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
     trackerLinks.push(["Annual Leave Tracker", LEAVE_TRACKER_PATH.slice(1), "Set allowances and see days used"]);
     trackerLinks.push(["Sick Days Tracker", SICK_TRACKER_PATH.slice(1), "Set allowances and see sick days used"]);
     trackerLinks.push(["Approve Leave Requests", "approve-leave", "Review and decide on pending requests"]);
+    trackerLinks.push(["Van Logs", "van-logs", "Checkout and return reports, with photos"]);
   }
 
   if (email === "iestyn@carlamltd.com") {
     trackerLinks.push(["Analytics", "analytics", "Traffic, usage, and system stats - just for you"]);
+  }
+
+  // The van pages are open to everyone with a valid login - no team or
+  // admin restriction, unlike the groups above.
+  if (email) {
+    vanLinks.push(["Book the Van", "book-van", "Check availability and reserve it"]);
+    vanLinks.push(["Van Calendar", "van-calendar", "See when the van's booked out"]);
+    vanLinks.push(["Van Checkout", "van-checkout", "Log mileage, fuel, and condition before you go"]);
+    vanLinks.push(["Van Return", "van-return", "Log mileage, fuel, and condition when you're back"]);
   }
 
   if (entry === "ALL") {
@@ -919,12 +930,13 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
     </div>`;
   }
 
-  const allEmpty = !myScheduleLinks.length && !masterLinks.length && !trackerLinks.length && !teamLinks.length;
+  const allEmpty = !myScheduleLinks.length && !masterLinks.length && !trackerLinks.length && !teamLinks.length && !vanLinks.length;
   const itemsHtml = allEmpty
     ? `<div class="empty">No schedules are assigned to your account yet.<br>If this looks wrong, check with Iestyn.</div>`
     : renderLinkGroup("My Schedule", myScheduleLinks) +
       renderLinkGroup("Master Schedule", masterLinks) +
       renderLinkGroup("Trackers", trackerLinks) +
+      renderLinkGroup("Van", vanLinks) +
       renderLinkGroup("Team Schedules", teamLinks);
 
   const statusHtml = syncedAt
@@ -2508,6 +2520,725 @@ ${THEME_PICKER_CSS}
 </html>`;
 }
 
+// ---------------------------------------------------------------------
+// Van booking system - 4 pages, all visible to everyone with a valid
+// @carlamltd.com login (no team/admin restriction, unlike most of the
+// rest of the site):
+//   /book-van       - book the van; rejects overlapping bookings
+//   /van-calendar   - month-grid overview of when it's booked out
+//   /van-checkout   - pre-trip inspection form (mileage/fuel/damage/photos)
+//   /van-return     - post-trip inspection form, same shape as checkout
+//
+// Photos are stored as base64 in the existing LEAVE_KV namespace - one KV
+// key per photo, resized/compressed to a small JPEG in the browser first
+// (see renderVanInspectionForm's client script). This avoids needing R2
+// (which requires billing details on file even to stay on the free tier)
+// and needs no new bindings at all - LEAVE_KV is already set up. The only
+// way to read a photo back out is the /van-image route below, which is
+// gated behind a valid company login, so storage stays private. At this
+// volume (a handful of resized photos a day) this comfortably sits inside
+// Workers KV's free tier (1GB storage, 1,000 writes/day) - if the van
+// ever gets used heavily enough to approach that, worth revisiting.
+const VAN_BOOKINGS_KEY = "van-bookings";
+const VAN_LOGS_KEY = "van-logs";
+const FUEL_LEVELS = ["Full", "3/4", "1/2", "1/4", "Empty"];
+const MAX_VAN_PHOTOS = 6;
+// Generous server-side backstop on base64 length (~6MB decoded) - the
+// client resizes photos to well under this before sending, so this only
+// ever bites if something bypasses the normal form.
+const MAX_VAN_PHOTO_BASE64_CHARS = 8 * 1024 * 1024;
+
+async function getVanBookings(env) {
+  try {
+    const stored = await env.LEAVE_KV.get(VAN_BOOKINGS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (err) {
+    console.error("Failed to read van bookings:", err);
+    return [];
+  }
+}
+
+async function saveVanBookings(env, bookings) {
+  await env.LEAVE_KV.put(VAN_BOOKINGS_KEY, JSON.stringify(bookings));
+}
+
+async function getVanLogs(env) {
+  try {
+    const stored = await env.LEAVE_KV.get(VAN_LOGS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (err) {
+    console.error("Failed to read van logs:", err);
+    return [];
+  }
+}
+
+async function saveVanLogs(env, logs) {
+  await env.LEAVE_KV.put(VAN_LOGS_KEY, JSON.stringify(logs));
+}
+
+// Bookings overlap if each one starts before the other ends. Plain string
+// comparison is enough here (no Date parsing, no timezone ambiguity)
+// because datetime-local values always arrive as zero-padded
+// "YYYY-MM-DDTHH:MM", which sorts identically to chronological order.
+function vanBookingsOverlap(aStart, aEnd, bStart, bEnd) {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+// Turns a literal "YYYY-MM-DDTHH:MM" wall-clock value into a Date anchored
+// at those exact numbers in UTC, purely so toLocaleString has something to
+// format from. Never used for real timezone math - this is what keeps
+// display consistent regardless of the Worker's own runtime timezone.
+function parseLocalDateTime(str) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(str);
+  if (!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]));
+}
+
+function formatVanDateTime(str) {
+  const d = parseLocalDateTime(str);
+  if (!d) return str;
+  return d.toLocaleString("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  });
+}
+
+function formatVanDateOnly(str) {
+  const d = parseLocalDateTime(str + "T00:00");
+  if (!d) return str;
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+// Decodes a base64 string back to raw bytes for serving as an image
+// response. atob/Uint8Array are both available as Workers globals, so
+// this needs no extra dependency.
+function base64ToBytes(base64) {
+  const binStr = atob(base64);
+  const bytes = new Uint8Array(binStr.length);
+  for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+  return bytes;
+}
+
+// Saves already-resized, already-base64-encoded photos (see the client
+// script in renderVanInspectionForm) to KV under one key per photo, and
+// returns the list of keys actually stored. Silently skips anything past
+// the count cap or over the size backstop - the client already resizes
+// and caps the count, so this only really matters as a safety net.
+async function saveVanPhotos(env, logId, photos) {
+  const keys = [];
+  let i = 0;
+  for (const photo of photos) {
+    if (i >= MAX_VAN_PHOTOS) break;
+    if (!photo || typeof photo.data !== "string" || !photo.data) continue;
+    if (photo.data.length > MAX_VAN_PHOTO_BASE64_CHARS) continue;
+    const contentType = typeof photo.contentType === "string" && photo.contentType ? photo.contentType : "image/jpeg";
+    const key = `van-photo:${logId}:${i}`;
+    await env.LEAVE_KV.put(key, JSON.stringify({ contentType, data: photo.data }));
+    keys.push(key);
+    i++;
+  }
+  return keys;
+}
+
+function renderBookVanForm(personName, bookings) {
+  const nowStr = new Date().toISOString().slice(0, 16);
+  const upcoming = bookings
+    .filter((b) => b.endDateTime >= nowStr)
+    .sort((a, b) => (a.startDateTime < b.startDateTime ? -1 : 1));
+
+  const upcomingHtml = upcoming.length
+    ? upcoming
+        .map(
+          (b) => `<div class="van-booking-card">
+            <div class="van-booking-when">${escapeHtml(formatVanDateTime(b.startDateTime))} &rarr; ${escapeHtml(formatVanDateTime(b.endDateTime))}</div>
+            <div class="van-booking-who">${escapeHtml(b.driverName)} &middot; ${escapeHtml(b.project)}</div>
+            <div class="van-booking-where">${escapeHtml(b.destination)}</div>
+          </div>`
+        )
+        .join("")
+    : `<div class="empty">No upcoming bookings - the van is free.</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>Book the Van</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 480px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
+  h2.section { font-size: 14px; margin: 22px 0 8px; }
+  .van-booking-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+  .van-booking-when { font-weight: 600; }
+  .van-booking-who { color: var(--text-dim); margin-top: 2px; }
+  .van-booking-where { color: var(--text-dim); margin-top: 2px; }
+  .empty { color: var(--text-dim); font-size: 13px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+  input[type="text"], input[type="datetime-local"], textarea {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  textarea { min-height: 60px; resize: vertical; }
+  button.submit-btn {
+    margin-top: 20px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    width: 100%;
+  }
+  button.submit-btn:hover { opacity: 0.9; }
+  button.submit-btn:disabled { background: #999; cursor: default; }
+  .form-message { margin-top: 14px; font-size: 13px; padding: 10px 12px; border-radius: 6px; }
+  .form-message.success { background: #d9ead3; color: #1a4d1a; }
+  .form-message.error { background: #f4cccc; color: #7a1a1a; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Book the Van</h1>
+  <div class="meta">Booking as ${escapeHtml(personName)}</div>
+
+  <h2 class="section">Already booked</h2>
+  ${upcomingHtml}
+
+  <h2 class="section">New booking</h2>
+  <form id="vanForm">
+    <label for="driverName">Driver</label>
+    <input type="text" id="driverName" name="driverName" required>
+
+    <label for="project">Project</label>
+    <input type="text" id="project" name="project" required>
+
+    <label for="destination">Where's it being driven?</label>
+    <input type="text" id="destination" name="destination" required>
+
+    <label for="startDateTime">Start</label>
+    <input type="datetime-local" id="startDateTime" name="startDateTime" required>
+
+    <label for="endDateTime">End</label>
+    <input type="datetime-local" id="endDateTime" name="endDateTime" required>
+
+    <label for="notes">Notes (optional)</label>
+    <textarea id="notes" name="notes"></textarea>
+
+    <button type="submit" class="submit-btn" id="submitBtn">Book the Van</button>
+    <div id="formMessage"></div>
+  </form>
+
+  ${THEME_PICKER_SCRIPT}
+  <script>
+    (function () {
+      var startInput = document.getElementById('startDateTime');
+      var endInput = document.getElementById('endDateTime');
+      startInput.addEventListener('change', function () {
+        if (!endInput.value || endInput.value < startInput.value) endInput.value = startInput.value;
+      });
+
+      document.getElementById('vanForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var btn = document.getElementById('submitBtn');
+        var msg = document.getElementById('formMessage');
+        btn.disabled = true;
+        msg.innerHTML = '';
+
+        var payload = {
+          driverName: document.getElementById('driverName').value,
+          project: document.getElementById('project').value,
+          destination: document.getElementById('destination').value,
+          startDateTime: startInput.value,
+          endDateTime: endInput.value,
+          notes: document.getElementById('notes').value,
+        };
+
+        try {
+          var resp = await fetch('/book-van', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          var data = await resp.json();
+          if (resp.ok) {
+            msg.innerHTML = '<div class="form-message success">Booked. <a href="van-calendar">View the calendar</a></div>';
+            document.getElementById('vanForm').reset();
+          } else {
+            msg.innerHTML = '<div class="form-message error">' + (data.error || 'Something went wrong.') + '</div>';
+            btn.disabled = false;
+          }
+        } catch (err) {
+          msg.innerHTML = '<div class="form-message error">Could not submit - check your connection.</div>';
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+function renderVanCalendar(bookings, monthParam) {
+  const now = new Date();
+  let year = now.getUTCFullYear();
+  let month = now.getUTCMonth(); // 0-indexed
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    year = parseInt(monthParam.slice(0, 4), 10);
+    month = parseInt(monthParam.slice(5, 7), 10) - 1;
+  }
+
+  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+  const firstWeekday = (firstOfMonth.getUTCDay() + 6) % 7; // Monday = 0
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+  const prevMonthDate = new Date(Date.UTC(year, month - 1, 1));
+  const nextMonthDate = new Date(Date.UTC(year, month + 1, 1));
+  const prevParam = `${prevMonthDate.getUTCFullYear()}-${String(prevMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
+  const nextParam = `${nextMonthDate.getUTCFullYear()}-${String(nextMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
+  const monthLabel = firstOfMonth.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+
+  // Map each covered date (YYYY-MM-DD) to the bookings that touch it, so
+  // multi-day bookings show up in every day cell they span.
+  const byDate = {};
+  for (const b of bookings) {
+    const startDate = b.startDateTime.slice(0, 10);
+    const endDate = b.endDateTime.slice(0, 10);
+    let cursor = new Date(startDate + "T00:00:00Z");
+    const end = new Date(endDate + "T00:00:00Z");
+    while (cursor.getTime() <= end.getTime()) {
+      const iso = cursor.toISOString().slice(0, 10);
+      (byDate[iso] = byDate[iso] || []).push(b);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  let cellsHtml = "";
+  for (let i = 0; i < firstWeekday; i++) cellsHtml += `<div class="cal-cell empty-cell"></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const dayBookings = byDate[iso] || [];
+    const chipsHtml = dayBookings
+      .map(
+        (b) =>
+          `<div class="cal-chip" title="${escapeHtml(b.driverName)} - ${escapeHtml(b.project)} - ${escapeHtml(b.destination)}">${escapeHtml(b.driverName)}</div>`
+      )
+      .join("");
+    const isToday = iso === todayIso ? " today" : "";
+    cellsHtml += `<div class="cal-cell${isToday}">
+      <div class="cal-daynum">${day}</div>
+      ${chipsHtml}
+    </div>`;
+  }
+
+  const nowStr = new Date().toISOString().slice(0, 16);
+  const upcoming = bookings
+    .filter((b) => b.endDateTime >= nowStr)
+    .sort((a, b) => (a.startDateTime < b.startDateTime ? -1 : 1));
+  const listHtml = upcoming.length
+    ? upcoming
+        .map(
+          (b) => `<div class="van-booking-card">
+            <div class="van-booking-when">${escapeHtml(formatVanDateTime(b.startDateTime))} &rarr; ${escapeHtml(formatVanDateTime(b.endDateTime))}</div>
+            <div class="van-booking-who">${escapeHtml(b.driverName)} &middot; ${escapeHtml(b.project)}</div>
+            <div class="van-booking-where">${escapeHtml(b.destination)}</div>
+          </div>`
+        )
+        .join("")
+    : `<div class="empty">No upcoming bookings - the van is free.</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>Van Calendar</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 640px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-nav a { font-size: 13px; color: var(--accent); text-decoration: none; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; }
+  .cal-nav a:hover { text-decoration: underline; }
+  .cal-month-label { font-size: 15px; font-weight: 700; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-weekday { font-size: 11px; color: var(--text-dim); text-align: center; padding-bottom: 4px; }
+  .cal-cell { min-height: 64px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px; font-size: 10px; overflow: hidden; }
+  .cal-cell.empty-cell { background: transparent; border: none; }
+  .cal-cell.today { border-color: var(--accent); border-width: 2px; }
+  .cal-daynum { font-size: 11px; color: var(--text-dim); font-weight: 600; margin-bottom: 2px; }
+  .cal-chip { background: var(--accent); color: #fff; border-radius: 4px; padding: 1px 4px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  h2.section { font-size: 14px; margin: 24px 0 8px; }
+  .van-booking-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+  .van-booking-when { font-weight: 600; }
+  .van-booking-who { color: var(--text-dim); margin-top: 2px; }
+  .van-booking-where { color: var(--text-dim); margin-top: 2px; }
+  .empty { color: var(--text-dim); font-size: 13px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Van Calendar</h1>
+  <div class="meta">When the van is booked out</div>
+
+  <div class="cal-nav">
+    <a href="/van-calendar?month=${prevParam}">&larr; Prev</a>
+    <div class="cal-month-label">${escapeHtml(monthLabel)}</div>
+    <a href="/van-calendar?month=${nextParam}">Next &rarr;</a>
+  </div>
+  <div class="cal-grid">
+    <div class="cal-weekday">Mon</div><div class="cal-weekday">Tue</div><div class="cal-weekday">Wed</div>
+    <div class="cal-weekday">Thu</div><div class="cal-weekday">Fri</div><div class="cal-weekday">Sat</div><div class="cal-weekday">Sun</div>
+    ${cellsHtml}
+  </div>
+
+  <h2 class="section">Upcoming bookings</h2>
+  ${listHtml}
+
+  ${THEME_PICKER_SCRIPT}
+</body>
+</html>`;
+}
+
+function renderVanInspectionForm(personName, type) {
+  const isCheckout = type === "checkout";
+  const title = isCheckout ? "Van Checkout" : "Van Return";
+  const intro = isCheckout ? "Before you leave with the van" : "After you bring the van back";
+  const actionPath = isCheckout ? "/van-checkout" : "/van-return";
+  const fuelOptionsHtml = FUEL_LEVELS.map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>${escapeHtml(title)}</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 480px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+  input[type="text"], input[type="date"], input[type="number"], select, textarea {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  textarea { min-height: 70px; resize: vertical; }
+  input[type="file"] { width: 100%; font-size: 13px; color: var(--text); margin-top: 4px; }
+  .hint { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  button.submit-btn {
+    margin-top: 20px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    width: 100%;
+  }
+  button.submit-btn:hover { opacity: 0.9; }
+  button.submit-btn:disabled { background: #999; cursor: default; }
+  .form-message { margin-top: 14px; font-size: 13px; padding: 10px 12px; border-radius: 6px; }
+  .form-message.success { background: #d9ead3; color: #1a4d1a; }
+  .form-message.error { background: #f4cccc; color: #7a1a1a; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="meta">${escapeHtml(intro)} &middot; ${escapeHtml(personName)}</div>
+
+  <form id="vanInspectionForm">
+    <label for="date">Date</label>
+    <input type="date" id="date" name="date" required>
+
+    <label for="mileage">Current mileage</label>
+    <input type="number" id="mileage" name="mileage" min="0" step="1" required>
+
+    <label for="fuelLevel">Fuel level</label>
+    <select id="fuelLevel" name="fuelLevel" required>
+      <option value="" disabled selected>Choose one</option>
+      ${fuelOptionsHtml}
+    </select>
+
+    <label for="damage">Any damage?</label>
+    <textarea id="damage" name="damage" placeholder="None"></textarea>
+
+    <label for="photos">Photos</label>
+    <input type="file" id="photos" name="photos" accept="image/*" capture="environment" multiple>
+    <div class="hint">Up to 6 photos - resized automatically before upload.</div>
+
+    <button type="submit" class="submit-btn" id="submitBtn">Submit</button>
+    <div id="formMessage"></div>
+  </form>
+
+  ${THEME_PICKER_SCRIPT}
+  <script>
+    (function () {
+      var dateInput = document.getElementById('date');
+      var today = new Date();
+      var iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      dateInput.value = iso;
+
+      // Shrinks a photo down to a max dimension and re-encodes it as a
+      // modest-quality JPEG before it ever leaves the browser - keeps
+      // uploads fast on mobile data and keeps each stored photo small
+      // (comfortably under Workers KV's per-key and daily-write limits).
+      function resizeImageToBase64(file, maxDim, quality) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          var url = URL.createObjectURL(file);
+          img.onload = function () {
+            URL.revokeObjectURL(url);
+            var w = img.width, h = img.height;
+            var scale = Math.min(1, maxDim / Math.max(w, h));
+            var cw = Math.max(1, Math.round(w * scale));
+            var ch = Math.max(1, Math.round(h * scale));
+            var canvas = document.createElement('canvas');
+            canvas.width = cw;
+            canvas.height = ch;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, cw, ch);
+            canvas.toBlob(function (blob) {
+              if (!blob) { reject(new Error('Could not process ' + file.name)); return; }
+              var reader = new FileReader();
+              reader.onload = function () {
+                var dataUrl = String(reader.result);
+                resolve({
+                  filename: file.name || 'photo.jpg',
+                  contentType: 'image/jpeg',
+                  data: dataUrl.slice(dataUrl.indexOf(',') + 1),
+                });
+              };
+              reader.onerror = function () { reject(new Error('Could not read ' + file.name)); };
+              reader.readAsDataURL(blob);
+            }, 'image/jpeg', quality);
+          };
+          img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Could not load ' + file.name)); };
+          img.src = url;
+        });
+      }
+
+      document.getElementById('vanInspectionForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var btn = document.getElementById('submitBtn');
+        var msg = document.getElementById('formMessage');
+        var fileList = document.getElementById('photos').files;
+
+        if (fileList.length > 6) {
+          msg.innerHTML = '<div class="form-message error">Please choose 6 photos or fewer.</div>';
+          return;
+        }
+
+        btn.disabled = true;
+        msg.innerHTML = fileList.length ? '<div class="form-message">Processing photos&hellip;</div>' : '';
+
+        try {
+          var photos = await Promise.all(
+            Array.prototype.map.call(fileList, function (f) { return resizeImageToBase64(f, 1280, 0.72); })
+          );
+
+          var payload = {
+            date: dateInput.value,
+            mileage: document.getElementById('mileage').value,
+            fuelLevel: document.getElementById('fuelLevel').value,
+            damage: document.getElementById('damage').value,
+            photos: photos,
+          };
+
+          var resp = await fetch('${actionPath}', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          var data = await resp.json();
+          if (resp.ok) {
+            msg.innerHTML = '<div class="form-message success">Saved. Thanks!</div>';
+            document.getElementById('vanInspectionForm').reset();
+            dateInput.value = iso;
+          } else {
+            msg.innerHTML = '<div class="form-message error">' + (data.error || 'Something went wrong.') + '</div>';
+            btn.disabled = false;
+          }
+        } catch (err) {
+          msg.innerHTML = '<div class="form-message error">' + (err && err.message ? err.message : 'Could not submit - check your connection.') + '</div>';
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+// Admin-only page listing every checkout/return report, newest first, each
+// expandable to full detail (mileage, fuel, damage notes, and photo
+// thumbnails) using the same click-to-expand pattern as the leave
+// approvals page. Read-only - there's nothing to action here, it's just a
+// record.
+function renderVanLogsPage(logs) {
+  const sorted = [...logs].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+
+  const cardsHtml = sorted.length
+    ? sorted
+        .map((l) => {
+          const typeLabel = l.type === "checkout" ? "Checkout" : "Return";
+          const typeClass = l.type === "checkout" ? "checkout" : "return";
+          const damageFlag = l.damage ? `<span class="damage-flag">Damage noted</span>` : "";
+          const photosHtml = l.imageKeys && l.imageKeys.length
+            ? `<div class="photo-grid">${l.imageKeys
+                .map(
+                  (key) =>
+                    `<a href="/van-image?key=${encodeURIComponent(key)}" target="_blank" rel="noopener">
+                      <img class="photo-thumb" src="/van-image?key=${encodeURIComponent(key)}" loading="lazy" alt="Van photo">
+                    </a>`
+                )
+                .join("")}</div>`
+            : `<div class="no-photos">No photos attached.</div>`;
+
+          return `<div class="req-card" data-id="${escapeHtml(l.id)}">
+            <div class="req-summary" onclick="toggleDetail('${escapeHtml(l.id)}')">
+              <div>
+                <div class="req-dates">
+                  <span class="type-badge ${typeClass}">${typeLabel}</span>
+                  ${escapeHtml(formatVanDateOnly(l.date))}
+                </div>
+                <div class="req-reason-preview">${escapeHtml(l.submittedByName)} &middot; ${escapeHtml(String(l.mileage))} mi &middot; ${escapeHtml(l.fuelLevel)} ${damageFlag}</div>
+              </div>
+              <span class="expand-arrow">&darr;</span>
+            </div>
+            <div class="req-detail" id="detail-${escapeHtml(l.id)}">
+              <div class="detail-row"><strong>Submitted by:</strong> ${escapeHtml(l.submittedByName)} (${escapeHtml(l.submittedByEmail)})</div>
+              <div class="detail-row"><strong>Mileage:</strong> ${escapeHtml(String(l.mileage))}</div>
+              <div class="detail-row"><strong>Fuel level:</strong> ${escapeHtml(l.fuelLevel)}</div>
+              <div class="detail-row"><strong>Damage:</strong> ${l.damage ? escapeHtml(l.damage) : "None noted"}</div>
+              <div class="req-submitted">Submitted ${escapeHtml(formatLogTime(l.createdAt))}</div>
+              <div class="detail-row" style="margin-top:10px;"><strong>Photos</strong></div>
+              ${photosHtml}
+            </div>
+          </div>`;
+        })
+        .join("")
+    : `<div class="empty">No checkout or return reports yet.</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>Van Logs</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 560px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
+  .req-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .req-summary { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; cursor: pointer; }
+  .req-dates { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .type-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; color: #fff; }
+  .type-badge.checkout { background: #3a7bd5; }
+  .type-badge.return { background: #6a4bc9; }
+  .req-reason-preview { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .damage-flag { color: #c0392b; font-weight: 600; }
+  .expand-arrow { color: var(--text-dim); }
+  .req-detail { display: none; padding: 0 14px 14px; border-top: 1px solid var(--border); }
+  .req-detail.open { display: block; }
+  .detail-row { font-size: 13px; padding-top: 8px; }
+  .req-submitted { font-size: 12px; color: var(--text-dim); margin-top: 8px; }
+  .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .photo-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; }
+  .no-photos { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .empty { color: var(--text-dim); font-size: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Van Logs</h1>
+  <div class="meta">Checkout and return reports &middot; click one to expand</div>
+  ${cardsHtml}
+  ${THEME_PICKER_SCRIPT}
+  <script>
+    function toggleDetail(id) {
+      document.getElementById('detail-' + id).classList.toggle('open');
+    }
+  </script>
+</body>
+</html>`;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -3098,6 +3829,220 @@ export default {
       const requests = await getLeaveRequests(env);
       return new Response(renderApprovalsPage(requests, null), {
         headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/book-van") {
+      const email = decodeAccessEmail(request);
+      if (!email) {
+        return new Response("Please log in.", { status: 403, headers: { "content-type": "text/plain; charset=UTF-8" } });
+      }
+      const personName = EMAIL_TO_NAME[email] || email;
+
+      if (!env.LEAVE_KV) {
+        return new Response(JSON.stringify({ error: "Storage isn't set up (missing LEAVE_KV binding)." }), {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (request.method === "POST") {
+        let body;
+        try {
+          body = await request.json();
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Invalid data." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const driverName = typeof body.driverName === "string" ? body.driverName.trim() : "";
+        const project = typeof body.project === "string" ? body.project.trim() : "";
+        const destination = typeof body.destination === "string" ? body.destination.trim() : "";
+        const startDateTime = typeof body.startDateTime === "string" ? body.startDateTime : "";
+        const endDateTime = typeof body.endDateTime === "string" ? body.endDateTime : "";
+        const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+
+        const dtPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+        if (!driverName || !project || !destination) {
+          return new Response(JSON.stringify({ error: "Please fill in driver, project, and destination." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (!dtPattern.test(startDateTime) || !dtPattern.test(endDateTime)) {
+          return new Response(JSON.stringify({ error: "Please provide valid start and end times." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (endDateTime <= startDateTime) {
+          return new Response(JSON.stringify({ error: "End time must be after the start time." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const bookings = await getVanBookings(env);
+        const conflict = bookings.find((b) => vanBookingsOverlap(startDateTime, endDateTime, b.startDateTime, b.endDateTime));
+        if (conflict) {
+          return new Response(
+            JSON.stringify({
+              error: `The van's already booked then - ${conflict.driverName} has it ${formatVanDateTime(conflict.startDateTime)} \u2192 ${formatVanDateTime(conflict.endDateTime)}.`,
+            }),
+            { status: 409, headers: { "content-type": "application/json" } }
+          );
+        }
+
+        const newBooking = {
+          id: generateRequestId(),
+          driverName,
+          project,
+          destination,
+          startDateTime,
+          endDateTime,
+          notes,
+          bookedByEmail: email,
+          bookedByName: personName,
+          createdAt: new Date().toISOString(),
+        };
+
+        bookings.push(newBooking);
+        await saveVanBookings(env, bookings);
+
+        return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+      }
+
+      const bookings = await getVanBookings(env);
+      return new Response(renderBookVanForm(personName, bookings), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/van-calendar") {
+      const email = decodeAccessEmail(request);
+      if (!email) {
+        return new Response("Please log in.", { status: 403, headers: { "content-type": "text/plain; charset=UTF-8" } });
+      }
+      const bookings = env.LEAVE_KV ? await getVanBookings(env) : [];
+      const monthParam = url.searchParams.get("month") || "";
+      return new Response(renderVanCalendar(bookings, monthParam), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/van-checkout" || url.pathname === "/van-return") {
+      const email = decodeAccessEmail(request);
+      if (!email) {
+        return new Response("Please log in.", { status: 403, headers: { "content-type": "text/plain; charset=UTF-8" } });
+      }
+      const personName = EMAIL_TO_NAME[email] || email;
+      const type = url.pathname === "/van-checkout" ? "checkout" : "return";
+
+      if (request.method === "POST") {
+        if (!env.LEAVE_KV) {
+          return new Response(JSON.stringify({ error: "Storage isn't set up (missing LEAVE_KV binding)." }), {
+            status: 500,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        let body;
+        try {
+          body = await request.json();
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Invalid data." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const date = typeof body.date === "string" ? body.date : "";
+        const fuelLevel = typeof body.fuelLevel === "string" ? body.fuelLevel : "";
+        const damage = typeof body.damage === "string" ? body.damage.trim() : "";
+        const mileage = Number(body.mileage);
+        const photosInput = Array.isArray(body.photos) ? body.photos.slice(0, MAX_VAN_PHOTOS) : [];
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return new Response(JSON.stringify({ error: "Please provide a valid date." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (!Number.isFinite(mileage) || mileage < 0) {
+          return new Response(JSON.stringify({ error: "Please provide a valid mileage." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (!FUEL_LEVELS.includes(fuelLevel)) {
+          return new Response(JSON.stringify({ error: "Please choose a fuel level." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const logId = generateRequestId();
+        let imageKeys = [];
+        try {
+          imageKeys = await saveVanPhotos(env, logId, photosInput);
+        } catch (err) {
+          console.error("Failed to save van photos:", err);
+          return new Response(JSON.stringify({ error: "Saved the form, but photo upload failed. Try again." }), { status: 500, headers: { "content-type": "application/json" } });
+        }
+
+        const newLog = {
+          id: logId,
+          type,
+          date,
+          mileage,
+          fuelLevel,
+          damage,
+          imageKeys,
+          submittedByEmail: email,
+          submittedByName: personName,
+          createdAt: new Date().toISOString(),
+        };
+
+        const logs = await getVanLogs(env);
+        logs.push(newLog);
+        await saveVanLogs(env, logs);
+
+        return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+      }
+
+      return new Response(renderVanInspectionForm(personName, type), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    // Private image fetch for van checkout/return photos. Gated behind a
+    // valid login (same catch-all boundary as the rest of the site) and
+    // restricted to the van/ key prefix, so this can never be used to read
+    // arbitrary R2 objects even if the bucket is reused for something else
+    // later.
+    if (url.pathname === "/van-logs") {
+      const email = decodeAccessEmail(request);
+      if (!email || !ANNUAL_LEAVE_VIEWERS.has(email)) {
+        return new Response("Not authorised.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+      const logs = env.LEAVE_KV ? await getVanLogs(env) : [];
+      return new Response(renderVanLogsPage(logs), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    // Private image fetch for van checkout/return photos. Gated behind a
+    // valid login (same catch-all boundary as the rest of the site) and
+    // restricted to the van-photo: key prefix, so this can never be used
+    // to read other, unrelated keys out of LEAVE_KV.
+    if (url.pathname === "/van-image") {
+      const email = decodeAccessEmail(request);
+      if (!email) {
+        return new Response("Please log in.", { status: 403, headers: { "content-type": "text/plain; charset=UTF-8" } });
+      }
+      if (!env.LEAVE_KV) {
+        return new Response("Photo storage isn't set up.", { status: 500, headers: { "content-type": "text/plain; charset=UTF-8" } });
+      }
+      const key = url.searchParams.get("key") || "";
+      if (!key.startsWith("van-photo:")) {
+        return new Response("Not found.", { status: 404, headers: { "content-type": "text/plain; charset=UTF-8" } });
+      }
+      const stored = await env.LEAVE_KV.get(key);
+      if (!stored) {
+        return new Response("Not found.", { status: 404, headers: { "content-type": "text/plain; charset=UTF-8" } });
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(stored);
+      } catch (err) {
+        return new Response("Not found.", { status: 404, headers: { "content-type": "text/plain; charset=UTF-8" } });
+      }
+      return new Response(base64ToBytes(parsed.data), {
+        headers: {
+          "content-type": parsed.contentType || "application/octet-stream",
+          "cache-control": "private, max-age=3600",
+        },
       });
     }
 
