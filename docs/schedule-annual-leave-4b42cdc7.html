@@ -317,7 +317,7 @@
 </div>
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Carlam Team Schedule - Annual Leave</h1>
-  <div class="meta">Last updated 16 Sep 2026, 15:26 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
+  <div class="meta">Last updated 16 Sep 2026, 15:27 UTC &middot; refreshes automatically every 2 minutes &middot; keep this tab open for a live view</div>
   <div class="scroll-hint" id="scrollHint">&larr; Scroll sideways to see everyone &rarr;</div>
   <div class="table-wrap" id="tableWrap">
     <table>
@@ -371,6 +371,37 @@
       });
     })();
   </script>
+  <script>
+(function () {
+  var el = document.getElementById('tableWrap');
+  var key = 'carlam_scroll_' + location.pathname;
+  function currentPos() {
+    return el ? [el.scrollTop, el.scrollLeft] : [window.scrollY, window.scrollX];
+  }
+  var saved = sessionStorage.getItem(key);
+  if (saved) {
+    var parts = saved.split(',');
+    var top = parseInt(parts[0], 10) || 0;
+    var left = parseInt(parts[1], 10) || 0;
+    if (el) {
+      el.scrollTop = top;
+      el.scrollLeft = left;
+    } else {
+      window.scrollTo(left, top);
+    }
+  }
+  var target = el || window;
+  var ticking = false;
+  target.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      ticking = false;
+      sessionStorage.setItem(key, currentPos().join(','));
+    });
+  }, { passive: true });
+})();
+</script>
   <script>
 (function () {
   function applyTheme(mode, colour) {
