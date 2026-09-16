@@ -299,6 +299,44 @@ const THEME_PICKER_SCRIPT = `<script>
 })();
 </script>`;
 
+// --- Scroll-position restore (auto-refreshing pages only) -----------------
+// The meta-refresh tag on live-data pages forces a real navigation every
+// couple of minutes, which resets scroll to the top - annoying if you're
+// mid-way down a long schedule. This saves scroll position (of #tableWrap
+// if the page has one, otherwise the window) to sessionStorage keyed by
+// path, and restores it as soon as the replacement page has rendered.
+const SCROLL_RESTORE_SCRIPT = `<script>
+(function () {
+  var el = document.getElementById('tableWrap');
+  var key = 'carlam_scroll_' + location.pathname;
+  function currentPos() {
+    return el ? [el.scrollTop, el.scrollLeft] : [window.scrollY, window.scrollX];
+  }
+  var saved = sessionStorage.getItem(key);
+  if (saved) {
+    var parts = saved.split(',');
+    var top = parseInt(parts[0], 10) || 0;
+    var left = parseInt(parts[1], 10) || 0;
+    if (el) {
+      el.scrollTop = top;
+      el.scrollLeft = left;
+    } else {
+      window.scrollTo(left, top);
+    }
+  }
+  var target = el || window;
+  var ticking = false;
+  target.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      ticking = false;
+      sessionStorage.setItem(key, currentPos().join(','));
+    });
+  }, { passive: true });
+})();
+</script>`;
+
 // --- User badge (top-left, on every page) ---------------------------------
 // Shows the logged-in person's name with a dropdown to log out of
 // Cloudflare Access. Rather than threading the name through every single
@@ -857,6 +895,7 @@ ${THEME_PICKER_CSS}
   </div>
 
   ${THEME_PICKER_SCRIPT}
+  ${SCROLL_RESTORE_SCRIPT}
 </body>
 </html>`;
 }
@@ -1100,6 +1139,7 @@ ${THEME_BOOTSTRAP_SCRIPT}
   </div>
   ${weatherScript}
   ${THEME_PICKER_SCRIPT}
+  ${SCROLL_RESTORE_SCRIPT}
   ${USER_BADGE_SCRIPT}
 </body>
 </html>`;
@@ -1249,6 +1289,7 @@ ${THEME_PICKER_CSS}
   <div class="meta">${escapeHtml(personName)} &middot; synced ${generatedAt} &middot; refreshes automatically every 2 minutes</div>
   ${itemsHtml}
   ${THEME_PICKER_SCRIPT}
+  ${SCROLL_RESTORE_SCRIPT}
   <script>
     (function () {
       var btn = document.getElementById('pastToggle');
@@ -1511,6 +1552,7 @@ ${THEME_PICKER_CSS}
   <div class="taken-list">${datesHtml}</div>
 
   ${THEME_PICKER_SCRIPT}
+  ${SCROLL_RESTORE_SCRIPT}
 </body>
 </html>`;
 }
@@ -2353,6 +2395,7 @@ ${THEME_PICKER_CSS}
   <div class="meta">${escapeHtml(personName)}</div>
   ${itemsHtml}
   ${THEME_PICKER_SCRIPT}
+  ${SCROLL_RESTORE_SCRIPT}
 </body>
 </html>`;
 }
@@ -2966,6 +3009,7 @@ ${THEME_PICKER_CSS}
   ${listHtml}
 
   ${THEME_PICKER_SCRIPT}
+  ${SCROLL_RESTORE_SCRIPT}
   ${VAN_DELETE_SCRIPT}
 </body>
 </html>`;
