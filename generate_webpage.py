@@ -270,6 +270,43 @@ THEME_BOOTSTRAP_SCRIPT = """<script>
 })();
 </script>"""
 
+# The meta-refresh tag on these pages forces a real navigation every couple
+# of minutes, which resets scroll to the top - annoying if you're mid-way
+# down a long schedule. This saves #tableWrap's scroll position to
+# sessionStorage keyed by path, and restores it once the replacement page
+# has rendered. Kept byte-for-byte identical to the copy in worker.js.
+SCROLL_RESTORE_SCRIPT = """<script>
+(function () {
+  var el = document.getElementById('tableWrap');
+  var key = 'carlam_scroll_' + location.pathname;
+  function currentPos() {
+    return el ? [el.scrollTop, el.scrollLeft] : [window.scrollY, window.scrollX];
+  }
+  var saved = sessionStorage.getItem(key);
+  if (saved) {
+    var parts = saved.split(',');
+    var top = parseInt(parts[0], 10) || 0;
+    var left = parseInt(parts[1], 10) || 0;
+    if (el) {
+      el.scrollTop = top;
+      el.scrollLeft = left;
+    } else {
+      window.scrollTo(left, top);
+    }
+  }
+  var target = el || window;
+  var ticking = false;
+  target.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      ticking = false;
+      sessionStorage.setItem(key, currentPos().join(','));
+    });
+  }, { passive: true });
+})();
+</script>"""
+
 THEME_PICKER_CSS = """
   .theme-picker-fixed {
     position: fixed;
@@ -797,6 +834,7 @@ def build_html(rows, page_title, back_link=None) -> str:
   <div class="meta">Last updated {generated_at} &middot; refreshes automatically every {AUTO_REFRESH_SECONDS // 60} minutes &middot; keep this tab open for a live view</div>
   {table_html}
   {scroll_hint_script if people else ""}
+  {SCROLL_RESTORE_SCRIPT if people else ""}
   {THEME_PICKER_SCRIPT}
 </body>
 </html>
