@@ -931,7 +931,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
   // The van pages are open to everyone with a valid login - no team or
   // admin restriction, unlike the groups above.
   if (email) {
-    vanLinks.push(["Book the Van", "book-van", "Request it - needs approval from Iestyn or Euros"]);
+    vanLinks.push(["Book the Van", "book-van", "Request it - needs approval"]);
     vanLinks.push(["My Van Requests", "my-van-requests", "Track the status of your requests"]);
     vanLinks.push(["Van Calendar", "van-calendar", "See when the van's booked out"]);
     vanLinks.push(["Van Checkout", "van-checkout", "Log mileage, fuel, and condition before you go"]);
@@ -2188,8 +2188,8 @@ ${THEME_PICKER_CSS}
       <label for="halfDayEnd" style="margin:0; font-weight:400;">Last day is a half day</label>
     </div>
 
-    <label for="reason">Reason</label>
-    <textarea id="reason" name="reason" required></textarea>
+    <label for="reason">Reason (optional)</label>
+    <textarea id="reason" name="reason"></textarea>
 
     <button type="submit" class="submit-btn" id="submitBtn">Submit Request</button>
     <div id="formMessage"></div>
@@ -2346,9 +2346,10 @@ function renderMyRequests(personName, requests) {
           const noteHtml = r.status === "rejected" && r.rejectionNote
             ? `<div class="req-note">Reason: ${escapeHtml(r.rejectionNote)}</div>`
             : "";
+          const reasonHtml = r.reason ? `<div class="req-reason">${escapeHtml(r.reason)}</div>` : "";
           return `<div class="req-card">
             <div class="req-dates">${escapeHtml(label)}</div>
-            <div class="req-reason">${escapeHtml(r.reason)}</div>
+            ${reasonHtml}
             <div class="req-status-row">${statusHtml}</div>
             ${noteHtml}
           </div>`;
@@ -2418,16 +2419,20 @@ function renderApprovalsPage(requests, message) {
     ? pending
         .map((r) => {
           const label = formatDateRangeLabel(r.startDate, r.endDate, r.halfDayStart, r.halfDayEnd);
+          const reasonPreview = r.reason
+            ? `${escapeHtml(r.reason.slice(0, 60))}${r.reason.length > 60 ? "\u2026" : ""}`
+            : `<span style="font-style:italic;">No reason given</span>`;
+          const reasonDetail = r.reason ? `<div class="req-reason">${escapeHtml(r.reason)}</div>` : "";
           return `<div class="req-card" data-id="${escapeHtml(r.id)}">
             <div class="req-summary" onclick="toggleDetail('${escapeHtml(r.id)}')">
               <div>
                 <div class="req-dates">${escapeHtml(r.personName)} &middot; ${escapeHtml(label)}</div>
-                <div class="req-reason-preview">${escapeHtml(r.reason.slice(0, 60))}${r.reason.length > 60 ? "\u2026" : ""}</div>
+                <div class="req-reason-preview">${reasonPreview}</div>
               </div>
               <span class="expand-arrow">&darr;</span>
             </div>
             <div class="req-detail" id="detail-${escapeHtml(r.id)}">
-              <div class="req-reason">${escapeHtml(r.reason)}</div>
+              ${reasonDetail}
               <div class="req-submitted">Submitted ${escapeHtml(formatLogTime(r.submittedAt))}</div>
               <div class="decision-row">
                 <button class="approve-btn" onclick="decide('${escapeHtml(r.id)}', 'accept')">Approve</button>
@@ -4049,9 +4054,6 @@ export default {
         }
         if (endDate < startDate) {
           return new Response(JSON.stringify({ error: "End date can't be before the start date." }), { status: 400, headers: { "content-type": "application/json" } });
-        }
-        if (!reason) {
-          return new Response(JSON.stringify({ error: "Please add a reason." }), { status: 400, headers: { "content-type": "application/json" } });
         }
 
         const newRequest = {
