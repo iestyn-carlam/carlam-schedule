@@ -3165,11 +3165,10 @@ const VAN_DELETE_SCRIPT = `<script>
   }
 </script>`;
 
-// A delete button shows up when the viewer either made the booking
-// themselves, or is one of the three admins - same group that runs the
-// leave trackers and van logs.
+// A delete button shows up only for Iestyn or Euros - the same two who
+// approve van requests.
 function renderVanBookingCard(b, email) {
-  const canDelete = !!email && (email === b.bookedByEmail || ANNUAL_LEAVE_VIEWERS.has(email));
+  const canDelete = !!email && VAN_APPROVERS.has(email);
   const deleteBtn = canDelete
     ? `<button type="button" class="van-delete-btn" onclick="deleteVanBooking('${escapeHtml(b.id)}')">Delete</button>`
     : "";
@@ -3410,7 +3409,7 @@ function renderVanCalendar(bookings, monthParam, email) {
     destination: b.destination,
     notes: b.notes || "",
     when: `${formatVanDateTime(b.startDateTime)} \u2192 ${formatVanDateTime(b.endDateTime)}`,
-    canDelete: !!email && (email === b.bookedByEmail || ANNUAL_LEAVE_VIEWERS.has(email)),
+    canDelete: !!email && VAN_APPROVERS.has(email),
   }));
 
   return `<!DOCTYPE html>
@@ -4787,9 +4786,9 @@ export default {
             return new Response(JSON.stringify({ error: "Booking not found - it may already have been deleted." }), { status: 404, headers: { "content-type": "application/json" } });
           }
           const target = bookings[idx];
-          const canDelete = email === target.bookedByEmail || ANNUAL_LEAVE_VIEWERS.has(email);
+          const canDelete = VAN_APPROVERS.has(email);
           if (!canDelete) {
-            return new Response(JSON.stringify({ error: "You can only delete your own bookings." }), { status: 403, headers: { "content-type": "application/json" } });
+            return new Response(JSON.stringify({ error: "Only Iestyn or Euros can delete van bookings." }), { status: 403, headers: { "content-type": "application/json" } });
           }
           bookings.splice(idx, 1);
           await saveVanBookings(env, bookings);
