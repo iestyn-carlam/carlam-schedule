@@ -931,10 +931,15 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
   // The van pages are open to everyone with a valid login - no team or
   // admin restriction, unlike the groups above.
   if (email) {
-    vanLinks.push(["Book the Van", "book-van", "Check availability and reserve it"]);
+    vanLinks.push(["Book the Van", "book-van", "Request it - needs approval from Iestyn or Euros"]);
+    vanLinks.push(["My Van Requests", "my-van-requests", "Track the status of your requests"]);
     vanLinks.push(["Van Calendar", "van-calendar", "See when the van's booked out"]);
     vanLinks.push(["Van Checkout", "van-checkout", "Log mileage, fuel, and condition before you go"]);
     vanLinks.push(["Van Return", "van-return", "Log mileage, fuel, and condition when you're back"]);
+  }
+
+  if (email && VAN_APPROVERS.has(email)) {
+    trackerLinks.push(["Approve Van Requests", "approve-van", "Review and decide on pending van requests"]);
   }
 
   if (entry === "ALL") {
@@ -2037,6 +2042,11 @@ const NOTION_DATABASE_ID = "cb3f71d4936942aeba976fd6a3b17e8a";
 const MAIL_FROM = "system@carlamltd.com";
 const APPROVER_EMAILS = ["eurosllyr@carlamltd.com"];
 
+// Who can approve/deny van requests - just Iestyn and Euros, deliberately
+// narrower than ANNUAL_LEAVE_VIEWERS (which also includes Derwena).
+const VAN_APPROVERS = new Set(["iestyn@carlamltd.com", "eurosllyr@carlamltd.com"]);
+const VAN_APPROVER_EMAILS = Array.from(VAN_APPROVERS);
+
 function generateRequestId() {
   return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 }
@@ -2564,11 +2574,21 @@ ${THEME_PICKER_CSS}
 }
 
 // ---------------------------------------------------------------------
-// Van booking system - 4 pages, all visible to everyone with a valid
+// Van booking system - request/approve, mirroring the annual leave
+// request workflow. Pages, all visible to everyone with a valid
 // @carlamltd.com login (no team/admin restriction, unlike most of the
-// rest of the site):
-//   /book-van       - book the van; rejects overlapping bookings
+// rest of the site) except the approvals page itself:
+//   /book-van       - submit a request to book the van (pending, not a
+//                      confirmed booking yet); rejects requests that
+//                      overlap an already-confirmed booking outright
+//   /my-van-requests - track the status of your own van requests
+//   /approve-van    - Iestyn and Euros only; approve/deny pending
+//                      requests. Approving turns the request into a real
+//                      confirmed booking; both submission and decision
+//                      send a real email via Microsoft Graph, same as
+//                      the leave request workflow
 //   /van-calendar   - month-grid overview of when it's booked out
+//                      (confirmed bookings only)
 //   /van-checkout   - pre-trip inspection form (mileage/fuel/damage/photos)
 //   /van-return     - post-trip inspection form, same shape as checkout
 //
@@ -2583,6 +2603,7 @@ ${THEME_PICKER_CSS}
 // Workers KV's free tier (1GB storage, 1,000 writes/day) - if the van
 // ever gets used heavily enough to approach that, worth revisiting.
 const VAN_BOOKINGS_KEY = "van-bookings";
+const VAN_REQUESTS_KEY = "van-requests";
 const VAN_LOGS_KEY = "van-logs";
 const FUEL_LEVELS = ["Full", "3/4", "1/2", "1/4", "Empty"];
 const MAX_VAN_PHOTOS = 6;
@@ -2603,6 +2624,27 @@ async function getVanBookings(env) {
 
 async function saveVanBookings(env, bookings) {
   await env.LEAVE_KV.put(VAN_BOOKINGS_KEY, JSON.stringify(bookings));
+}
+
+async function getVanRequests(env) {
+  try {
+    const stored = await env.LEAVE_KV.get(VAN_REQUESTS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (err) {
+    console.error("Failed to read van requests:", err);
+    return [];
+  }
+}
+
+async function saveVanRequests(env, requests) {
+  await env.LEAVE_KV.put(VAN_REQUESTS_KEY, JSON.stringify(requests));
+}
+
+// Label used on the request/decision emails and the my-requests /
+// approvals pages - same shape as formatDateRangeLabel but for the
+// van's datetime-local range rather than whole leave days.
+function formatVanRangeLabel(startDateTime, endDateTime) {
+  return `${formatVanDateTime(startDateTime)} \u2192 ${formatVanDateTime(endDateTime)}`;
 }
 
 async function getVanLogs(env) {
@@ -2759,6 +2801,7 @@ ${THEME_PICKER_CSS}
   a.back:hover { text-decoration: underline; }
   h1 { font-size: 20px; margin: 0 0 4px 0; }
   .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
+  .submeta { font-size: 12px; color: var(--text-dim); margin: -12px 0 16px; }
   h2.section { font-size: 14px; margin: 22px 0 8px; }
   .van-booking-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
   .van-booking-when { font-weight: 600; }
@@ -2802,12 +2845,13 @@ ${THEME_PICKER_CSS}
   ${THEME_PICKER_HTML}
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>Book the Van</h1>
-  <div class="meta">Booking as ${escapeHtml(personName)}</div>
+  <div class="meta">Requesting as ${escapeHtml(personName)}</div>
+  <div class="submeta">Van requests need approval from Iestyn or Euros before they're confirmed.</div>
 
   <h2 class="section">Already booked</h2>
   ${upcomingHtml}
 
-  <h2 class="section">New booking</h2>
+  <h2 class="section">New request</h2>
   <form id="vanForm">
     <label for="driverName">Driver</label>
     <input type="text" id="driverName" name="driverName" required>
@@ -2827,7 +2871,7 @@ ${THEME_PICKER_CSS}
     <label for="notes">Notes (optional)</label>
     <textarea id="notes" name="notes"></textarea>
 
-    <button type="submit" class="submit-btn" id="submitBtn">Book the Van</button>
+    <button type="submit" class="submit-btn" id="submitBtn">Submit Request</button>
     <div id="formMessage"></div>
   </form>
 
@@ -2865,7 +2909,7 @@ ${THEME_PICKER_CSS}
           });
           var data = await resp.json();
           if (resp.ok) {
-            msg.innerHTML = '<div class="form-message success">Booked. <a href="van-calendar">View the calendar</a></div>';
+            msg.innerHTML = '<div class="form-message success">Request submitted. <a href="my-van-requests">View your requests</a></div>';
             document.getElementById('vanForm').reset();
           } else {
             msg.innerHTML = '<div class="form-message error">' + (data.error || 'Something went wrong.') + '</div>';
@@ -3011,6 +3055,255 @@ ${THEME_PICKER_CSS}
   ${THEME_PICKER_SCRIPT}
   ${SCROLL_RESTORE_SCRIPT}
   ${VAN_DELETE_SCRIPT}
+</body>
+</html>`;
+}
+
+// Mirrors renderMyRequests (annual leave) for van requests.
+function renderMyVanRequests(personName, requests) {
+  const mine = requests
+    .filter((r) => r.personName === personName)
+    .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1));
+
+  const itemsHtml = mine.length
+    ? mine
+        .map((r) => {
+          const label = formatVanRangeLabel(r.startDateTime, r.endDateTime);
+          let statusHtml;
+          if (r.status === "pending") {
+            statusHtml = `<span class="req-status pending">In Progress</span>`;
+          } else if (r.status === "accepted") {
+            statusHtml = `<span class="req-status accepted">Accepted</span> <span class="req-decided">by ${escapeHtml(r.decidedBy)}, ${escapeHtml(formatLogTime(r.decidedAt))}</span>`;
+          } else {
+            statusHtml = `<span class="req-status rejected">Rejected</span> <span class="req-decided">by ${escapeHtml(r.decidedBy)}, ${escapeHtml(formatLogTime(r.decidedAt))}</span>`;
+          }
+          const noteHtml = r.status === "rejected" && r.rejectionNote
+            ? `<div class="req-note">Reason: ${escapeHtml(r.rejectionNote)}</div>`
+            : "";
+          return `<div class="req-card">
+            <div class="req-dates">${escapeHtml(label)}</div>
+            <div class="req-reason">${escapeHtml(r.driverName)} &middot; ${escapeHtml(r.project)} &middot; ${escapeHtml(r.destination)}</div>
+            <div class="req-status-row">${statusHtml}</div>
+            ${noteHtml}
+          </div>`;
+        })
+        .join("")
+    : `<div class="empty">You haven't requested the van yet.</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>My Van Requests</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 560px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  .req-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .req-dates { font-weight: 600; font-size: 14px; }
+  .req-reason { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .req-status-row { margin-top: 8px; font-size: 12px; }
+  .req-status { font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+  .req-status.pending { background: #fff2cc; color: #7a5b00; }
+  .req-status.accepted { background: #d9ead3; color: #1a4d1a; }
+  .req-status.rejected { background: #f4cccc; color: #7a1a1a; }
+  .req-decided { color: var(--text-dim); }
+  .req-note { font-size: 12px; color: var(--text-dim); font-style: italic; margin-top: 6px; }
+  .empty { color: var(--text-dim); font-size: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>My Van Requests</h1>
+  <div class="meta">${escapeHtml(personName)}</div>
+  ${itemsHtml}
+  ${THEME_PICKER_SCRIPT}
+  ${SCROLL_RESTORE_SCRIPT}
+</body>
+</html>`;
+}
+
+// Mirrors renderApprovalsPage (annual leave) for van requests.
+function renderVanApprovalsPage(requests, message) {
+  const pending = requests.filter((r) => r.status === "pending").sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1));
+  const decided = requests.filter((r) => r.status !== "pending").sort((a, b) => (a.decidedAt < b.decidedAt ? 1 : -1));
+
+  const pendingHtml = pending.length
+    ? pending
+        .map((r) => {
+          const label = formatVanRangeLabel(r.startDateTime, r.endDateTime);
+          return `<div class="req-card" data-id="${escapeHtml(r.id)}">
+            <div class="req-summary" onclick="toggleDetail('${escapeHtml(r.id)}')">
+              <div>
+                <div class="req-dates">${escapeHtml(r.personName)} &middot; ${escapeHtml(label)}</div>
+                <div class="req-reason-preview">${escapeHtml(r.driverName)} \u2014 ${escapeHtml(r.project)} \u2014 ${escapeHtml(r.destination)}</div>
+              </div>
+              <span class="expand-arrow">&darr;</span>
+            </div>
+            <div class="req-detail" id="detail-${escapeHtml(r.id)}">
+              <div class="req-reason">${escapeHtml(r.driverName)} &middot; ${escapeHtml(r.project)} &middot; ${escapeHtml(r.destination)}${r.notes ? " &middot; " + escapeHtml(r.notes) : ""}</div>
+              <div class="req-submitted">Submitted ${escapeHtml(formatLogTime(r.submittedAt))}</div>
+              <div class="decision-row">
+                <button class="approve-btn" onclick="decide('${escapeHtml(r.id)}', 'accept')">Approve</button>
+                <button class="deny-btn" onclick="showDenyNote('${escapeHtml(r.id)}')">Deny</button>
+              </div>
+              <div class="deny-note-row" id="denyRow-${escapeHtml(r.id)}" style="display:none;">
+                <textarea id="denyNote-${escapeHtml(r.id)}" placeholder="Reason for declining (required)"></textarea>
+                <button class="confirm-deny-btn" onclick="decide('${escapeHtml(r.id)}', 'reject')">Confirm Deny</button>
+              </div>
+            </div>
+          </div>`;
+        })
+        .join("")
+    : `<div class="empty">No pending requests.</div>`;
+
+  const decidedHtml = decided.length
+    ? decided
+        .map((r) => {
+          const label = formatVanRangeLabel(r.startDateTime, r.endDateTime);
+          const statusClass = r.status === "accepted" ? "accepted" : "rejected";
+          return `<div class="log-entry">
+            <span class="log-time">${escapeHtml(formatLogTime(r.decidedAt))}</span>
+            <span class="req-status ${statusClass}">${r.status === "accepted" ? "Accepted" : "Rejected"}</span>
+            <span class="log-desc">${escapeHtml(r.personName)} \u2014 ${escapeHtml(label)}, decided by ${escapeHtml(r.decidedBy)}</span>
+          </div>`;
+        })
+        .join("")
+    : `<div class="log-empty">No decisions yet.</div>`;
+
+  const messageHtml = message ? `<div class="page-message">${escapeHtml(message)}</div>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${THEME_BOOTSTRAP_SCRIPT}
+<title>Approve Van Requests</title>
+<style>
+${THEME_VARS_CSS}
+${THEME_PICKER_CSS}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 560px;
+  }
+  a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
+  a.back:hover { text-decoration: underline; }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
+  .page-message { font-size: 13px; padding: 10px 12px; border-radius: 6px; background: #d9ead3; color: #1a4d1a; margin-bottom: 14px; }
+  .req-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .req-summary { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; cursor: pointer; }
+  .req-dates { font-weight: 600; font-size: 14px; }
+  .req-reason-preview { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .expand-arrow { color: var(--text-dim); }
+  .req-detail { display: none; padding: 0 14px 14px; border-top: 1px solid var(--border); }
+  .req-detail.open { display: block; }
+  .req-reason { font-size: 13px; padding-top: 10px; }
+  .req-submitted { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .decision-row { display: flex; gap: 10px; margin-top: 12px; }
+  .approve-btn, .deny-btn, .confirm-deny-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #fff;
+  }
+  .approve-btn { background: #2a9d4a; }
+  .deny-btn { background: #c0392b; }
+  .confirm-deny-btn { background: #c0392b; margin-top: 8px; }
+  .deny-note-row { margin-top: 10px; }
+  .deny-note-row textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .empty { color: var(--text-dim); font-size: 14px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .decided-heading { font-size: 14px; font-weight: 600; margin: 24px 0 10px; }
+  .log-entry { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; flex-wrap: wrap; background: var(--surface); border-radius: 6px; margin-bottom: 6px; }
+  .log-time { color: var(--text-dim); min-width: 130px; }
+  .log-desc { color: var(--text); }
+  .log-empty { padding: 14px; color: var(--text-dim); font-size: 13px; }
+  .req-status { font-weight: 700; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .req-status.accepted { background: #d9ead3; color: #1a4d1a; }
+  .req-status.rejected { background: #f4cccc; color: #7a1a1a; }
+</style>
+</head>
+<body>
+  ${THEME_PICKER_HTML}
+  <a class="back" href="index.html">&larr; All schedules</a>
+  <h1>Approve Van Requests</h1>
+  <div class="meta">Click a request to see full details and decide.</div>
+  ${messageHtml}
+  ${pendingHtml}
+  <div class="decided-heading">Recent decisions</div>
+  ${decidedHtml}
+  ${THEME_PICKER_SCRIPT}
+  <script>
+    function toggleDetail(id) {
+      document.getElementById('detail-' + id).classList.toggle('open');
+    }
+    function showDenyNote(id) {
+      document.getElementById('denyRow-' + id).style.display = 'block';
+    }
+    async function decide(id, action) {
+      var note = '';
+      if (action === 'reject') {
+        note = document.getElementById('denyNote-' + id).value.trim();
+        if (!note) {
+          alert('Please add a reason before denying.');
+          return;
+        }
+      }
+      try {
+        var resp = await fetch('/approve-van', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ id: id, action: action, note: note }),
+        });
+        if (resp.ok) {
+          location.reload();
+        } else {
+          var data = await resp.json();
+          alert(data.error || 'Something went wrong.');
+        }
+      } catch (err) {
+        alert('Could not submit - check your connection.');
+      }
+    }
+  </script>
 </body>
 </html>`;
 }
@@ -3963,6 +4256,11 @@ export default {
           return new Response(JSON.stringify({ error: "End time must be after the start time." }), { status: 400, headers: { "content-type": "application/json" } });
         }
 
+        // Only a request at this point, not a confirmed booking - but a
+        // request that already collides with a *confirmed* booking is
+        // never approvable, so reject it outright here rather than let it
+        // sit pending. (Overlap against other pending requests is fine -
+        // the approver can see and decide between them.)
         const bookings = await getVanBookings(env);
         const conflict = bookings.find((b) => vanBookingsOverlap(startDateTime, endDateTime, b.startDateTime, b.endDateTime));
         if (conflict) {
@@ -3974,27 +4272,171 @@ export default {
           );
         }
 
-        const newBooking = {
+        const newRequest = {
           id: generateRequestId(),
+          personEmail: email,
+          personName,
           driverName,
           project,
           destination,
           startDateTime,
           endDateTime,
           notes,
-          bookedByEmail: email,
-          bookedByName: personName,
-          createdAt: new Date().toISOString(),
+          submittedAt: new Date().toISOString(),
+          status: "pending",
+          decidedBy: null,
+          decidedAt: null,
+          rejectionNote: null,
         };
 
-        bookings.push(newBooking);
-        await saveVanBookings(env, bookings);
+        const requests = await getVanRequests(env);
+        requests.push(newRequest);
+        await saveVanRequests(env, requests);
+
+        const label = formatVanRangeLabel(startDateTime, endDateTime);
+        ctx.waitUntil(
+          sendMail(
+            env,
+            VAN_APPROVER_EMAILS,
+            `Van request - ${personName}`,
+            `<p><strong>${escapeHtml(personName)}</strong> has requested the van.</p>
+             <p><strong>When:</strong> ${escapeHtml(label)}<br>
+             <strong>Driver:</strong> ${escapeHtml(driverName)}<br>
+             <strong>Project:</strong> ${escapeHtml(project)}<br>
+             <strong>Destination:</strong> ${escapeHtml(destination)}</p>
+             ${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+             <p><a href="https://carlam-schedule.iestyn-041.workers.dev/approve-van">Review this request</a></p>`
+          )
+        );
 
         return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
       }
 
       const bookings = await getVanBookings(env);
       return new Response(renderBookVanForm(personName, bookings, email), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/my-van-requests") {
+      const email = decodeAccessEmail(request);
+      const personName = email ? EMAIL_TO_NAME[email] : null;
+
+      if (!personName) {
+        return new Response("Your account isn't linked to a name yet. Check with Iestyn.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      const requests = env.LEAVE_KV ? await getVanRequests(env) : [];
+      return new Response(renderMyVanRequests(personName, requests), {
+        headers: { "content-type": "text/html; charset=UTF-8" },
+      });
+    }
+
+    if (url.pathname === "/approve-van") {
+      const email = decodeAccessEmail(request);
+
+      if (!email || !VAN_APPROVERS.has(email)) {
+        return new Response("Not authorised.", {
+          status: 403,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      if (!env.LEAVE_KV) {
+        return new Response("Van data storage isn't set up yet (missing LEAVE_KV binding).", {
+          status: 500,
+          headers: { "content-type": "text/plain; charset=UTF-8" },
+        });
+      }
+
+      if (request.method === "POST") {
+        let body;
+        try {
+          body = await request.json();
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Invalid data." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const { id, action, note } = body;
+        if (!id || (action !== "accept" && action !== "reject")) {
+          return new Response(JSON.stringify({ error: "Invalid request." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (action === "reject" && !(note && note.trim())) {
+          return new Response(JSON.stringify({ error: "A reason is required to deny a request." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const requests = await getVanRequests(env);
+        const idx = requests.findIndex((r) => r.id === id);
+        if (idx === -1) {
+          return new Response(JSON.stringify({ error: "Request not found." }), { status: 404, headers: { "content-type": "application/json" } });
+        }
+        if (requests[idx].status !== "pending") {
+          return new Response(JSON.stringify({ error: "This request has already been decided." }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+
+        const decidedBy = EMAIL_TO_NAME[email] || email;
+        const nowISO = new Date().toISOString();
+        const reqRecord = requests[idx];
+
+        if (action === "accept") {
+          // Re-check for conflicts at decision time too - another request
+          // could have been approved in between submission and now.
+          const bookings = await getVanBookings(env);
+          const conflict = bookings.find((b) =>
+            vanBookingsOverlap(reqRecord.startDateTime, reqRecord.endDateTime, b.startDateTime, b.endDateTime)
+          );
+          if (conflict) {
+            return new Response(
+              JSON.stringify({
+                error: `Can't approve - ${conflict.driverName} already has the van ${formatVanDateTime(conflict.startDateTime)} \u2192 ${formatVanDateTime(conflict.endDateTime)}. Deny this request instead, or ask them to check.`,
+              }),
+              { status: 409, headers: { "content-type": "application/json" } }
+            );
+          }
+
+          bookings.push({
+            id: generateRequestId(),
+            driverName: reqRecord.driverName,
+            project: reqRecord.project,
+            destination: reqRecord.destination,
+            startDateTime: reqRecord.startDateTime,
+            endDateTime: reqRecord.endDateTime,
+            notes: reqRecord.notes,
+            bookedByEmail: reqRecord.personEmail,
+            bookedByName: reqRecord.personName,
+            createdAt: nowISO,
+          });
+          await saveVanBookings(env, bookings);
+        }
+
+        reqRecord.status = action === "accept" ? "accepted" : "rejected";
+        reqRecord.decidedBy = decidedBy;
+        reqRecord.decidedAt = nowISO;
+        reqRecord.rejectionNote = action === "reject" ? note.trim() : null;
+
+        await saveVanRequests(env, requests);
+
+        const label = formatVanRangeLabel(reqRecord.startDateTime, reqRecord.endDateTime);
+        const outcomeText = action === "accept" ? "accepted" : "declined";
+        const noteBlock = action === "reject" ? `<p><strong>Reason:</strong> ${escapeHtml(reqRecord.rejectionNote)}</p>` : "";
+        ctx.waitUntil(
+          sendMail(
+            env,
+            [reqRecord.personEmail],
+            `Your van request has been ${outcomeText}`,
+            `<p>Your van request for <strong>${escapeHtml(label)}</strong> has been <strong>${outcomeText}</strong> by ${escapeHtml(decidedBy)}.</p>
+             ${noteBlock}`
+          )
+        );
+
+        return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+      }
+
+      const requests = await getVanRequests(env);
+      return new Response(renderVanApprovalsPage(requests, null), {
         headers: { "content-type": "text/html; charset=UTF-8" },
       });
     }
