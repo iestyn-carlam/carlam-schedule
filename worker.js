@@ -1256,10 +1256,12 @@ ${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
-    padding: 16px;
+    padding: 16px 24px 40px;
     background: var(--bg);
     color: var(--text);
-    max-width: 680px;
+    max-width: 1180px;
+    width: 100%;
+    box-sizing: border-box;
   }
   .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   a.back {
@@ -1287,6 +1289,7 @@ ${THEME_PICKER_CSS}
   .view-tab:hover { color: var(--text); }
   .view-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
+  .list-wrap { max-width: 640px; }
   .entry { margin-bottom: 10px; }
   .entry-date { font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 4px; }
   .entry-body {
@@ -1317,23 +1320,54 @@ ${THEME_PICKER_CSS}
   .past-entries { display: none; margin-bottom: 14px; }
   .past-entries.visible { display: block; }
 
-  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .cal-nav a { font-size: 13px; color: var(--accent); text-decoration: none; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-nav a { font-size: 14px; color: var(--accent); text-decoration: none; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
   .cal-nav a:hover { text-decoration: underline; }
-  .cal-month-label { font-size: 15px; font-weight: 700; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .cal-weekday { font-size: 11px; color: var(--text-dim); text-align: center; padding-bottom: 4px; }
-  .cal-cell { min-height: 72px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px; font-size: 10px; overflow: hidden; }
+  .cal-month-label { font-size: 18px; font-weight: 700; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-weekday { font-size: 12px; color: var(--text-dim); text-align: center; padding-bottom: 6px; font-weight: 600; }
+  .cal-cell { min-height: 130px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px; font-size: 12px; overflow: hidden; }
   .cal-cell.empty-cell { background: transparent; border: none; }
-  .cal-cell.today { border-color: var(--accent); border-width: 2px; }
-  .cal-daynum { font-size: 11px; color: var(--text-dim); font-weight: 600; margin-bottom: 2px; }
-  .cal-chip { color: #1a1a1a; border-radius: 4px; padding: 1px 4px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-cell.today { border-color: var(--accent); border-width: 2px; background: var(--surface-hover); }
+  .cal-daynum { font-size: 12px; color: var(--text-dim); font-weight: 700; margin-bottom: 4px; }
+  .cal-cell.today .cal-daynum { color: var(--accent); }
+  .cal-chip {
+    color: #1a1a1a;
+    border-radius: 4px;
+    padding: 3px 6px;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11.5px;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+    text-align: left;
+    display: block;
+    font-family: inherit;
+  }
+  .cal-chip:hover { filter: brightness(0.93); }
 
+  .sheet-toggle {
+    display: block;
+    width: 100%;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin: 10px 0;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .sheet-toggle:hover { background: var(--surface-hover); }
   .sheet-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-  table.sheet-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 520px; }
+  table.sheet-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 620px; }
   table.sheet-table th, table.sheet-table td {
     text-align: left;
-    padding: 7px 10px;
+    padding: 9px 12px;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
@@ -1346,10 +1380,58 @@ ${THEME_PICKER_CSS}
     top: 0;
   }
   table.sheet-table tbody tr:nth-child(even) { background: var(--surface); }
-  table.sheet-table tr.today-row td { font-weight: 700; }
+  table.sheet-table tr.today-row td { font-weight: 700; background: var(--surface-hover); border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); }
   table.sheet-table tr.past-row td { opacity: 0.55; }
   .sheet-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
   .sheet-empty { color: var(--text-dim); font-style: italic; white-space: normal; }
+  .today-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    max-width: 400px;
+    width: 100%;
+    color: var(--text);
+  }
+  .modal-box h3 { margin: 0 0 12px; font-size: 17px; }
+  .modal-row { font-size: 13.5px; margin-bottom: 8px; line-height: 1.4; }
+  .modal-row strong { color: var(--text-dim); font-weight: 600; margin-right: 4px; }
+  .modal-close {
+    margin-top: 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .modal-close:hover { opacity: 0.9; }
 </style>
 </head>
 <body>
@@ -1364,7 +1446,7 @@ ${THEME_PICKER_CSS}
     <button type="button" class="view-tab" data-view="sheet">Spreadsheet</button>
   </div>
 
-  <div class="view-panel" id="view-list">
+  <div class="view-panel list-wrap" id="view-list">
     ${itemsHtml}
   </div>
 
@@ -1381,6 +1463,7 @@ ${THEME_PICKER_CSS}
   </div>
 
   <div class="view-panel" id="view-sheet" style="display:none;">
+    <button type="button" class="sheet-toggle" id="sheetShowEarlierBtn" style="display:none;"></button>
     <div class="sheet-wrap">
       <table class="sheet-table">
         <thead>
@@ -1388,8 +1471,19 @@ ${THEME_PICKER_CSS}
             <th>Date</th><th>Day</th><th>Programme</th><th>Status</th><th>Task</th><th class="sheet-notes-th">Notes</th>
           </tr>
         </thead>
-        <tbody id="sheetBody"></tbody>
+        <tbody id="sheetPastBody"></tbody>
+        <tbody id="sheetWeekBody"></tbody>
+        <tbody id="sheetLaterBody"></tbody>
       </table>
+    </div>
+    <button type="button" class="sheet-toggle" id="sheetShowLaterBtn" style="display:none;"></button>
+  </div>
+
+  <div class="modal-overlay" id="entryModal">
+    <div class="modal-box">
+      <h3 id="entryModalTitle"></h3>
+      <div id="entryModalBody"></div>
+      <button type="button" class="modal-close" id="entryModalClose">Close</button>
     </div>
   </div>
 
@@ -1417,11 +1511,34 @@ ${THEME_PICKER_CSS}
       var TODAY_ISO = ${JSON.stringify(todayIso)};
       var STORAGE_KEY = 'carlam_my_schedule_view';
 
+      MY_ENTRIES.forEach(function (e, i) { e.id = i; });
+
       function escHtml(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
           return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
         });
       }
+
+      // --- Detail modal, shared by the calendar view (spreadsheet stays a
+      // flat table, so it doesn't need it). ---
+      var modal = document.getElementById('entryModal');
+      var modalTitle = document.getElementById('entryModalTitle');
+      var modalBody = document.getElementById('entryModalBody');
+      function openEntryModal(entry) {
+        var d = new Date(entry.date + 'T00:00:00Z');
+        var dateLabel = d.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' });
+        modalTitle.textContent = entry.title || 'Untitled';
+        modalBody.innerHTML =
+          '<div class="modal-row"><strong>Date:</strong>' + escHtml(dateLabel) + '</div>' +
+          (entry.programme ? '<div class="modal-row"><strong>Programme:</strong>' + escHtml(entry.programme) + '</div>' : '') +
+          (entry.status ? '<div class="modal-row"><strong>Status:</strong>' + escHtml(entry.status) + '</div>' : '') +
+          (entry.notes ? '<div class="modal-row"><strong>Notes:</strong>' + escHtml(entry.notes) + '</div>' : '');
+        modal.classList.add('open');
+      }
+      function closeModal() { modal.classList.remove('open'); }
+      document.getElementById('entryModalClose').addEventListener('click', closeModal);
+      modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
       var tabs = Array.prototype.slice.call(document.querySelectorAll('.view-tab'));
       var panels = {
@@ -1451,7 +1568,7 @@ ${THEME_PICKER_CSS}
 
       // --- Calendar view: a simple month grid, built and navigated
       // entirely client-side from MY_ENTRIES, so switching months never
-      // needs a page reload. ---
+      // needs a page reload. Chips are clickable and open the detail modal. ---
       var calYear, calMonth;
       function buildCalendar() {
         calendarBuilt = true;
@@ -1470,6 +1587,12 @@ ${THEME_PICKER_CSS}
           calMonth++;
           if (calMonth > 11) { calMonth = 0; calYear++; }
           renderCalendar();
+        });
+        document.getElementById('calGrid').addEventListener('click', function (e) {
+          var chip = e.target.closest ? e.target.closest('.cal-chip') : null;
+          if (!chip) return;
+          var entry = MY_ENTRIES[chip.getAttribute('data-id')];
+          if (entry) openEntryModal(entry);
         });
       }
       function renderCalendar() {
@@ -1490,10 +1613,10 @@ ${THEME_PICKER_CSS}
           var dayEntries = byDate[iso] || [];
           var chips = dayEntries.map(function (e) {
             var label = [e.programme, e.status, e.title].filter(Boolean).join(' - ') || 'Untitled';
-            return '<div class="cal-chip" style="background:' + e.colour + '" title="' + escHtml(label) + '">' + escHtml(label) + '</div>';
+            return '<button type="button" class="cal-chip" data-id="' + e.id + '" style="background:' + e.colour + '">' + escHtml(label) + '</button>';
           }).join('');
           var isToday = iso === TODAY_ISO ? ' today' : '';
-          html += '<div class="cal-cell' + isToday + '"><div class="cal-daynum">' + day + '</div>' + chips + '</div>';
+          html += '<div class="cal-cell' + isToday + '"><div class="cal-daynum">' + day + (isToday ? ' <span class="today-badge">TODAY</span>' : '') + '</div>' + chips + '</div>';
         }
 
         // Keep the weekday header row, replace everything after it.
@@ -1504,31 +1627,84 @@ ${THEME_PICKER_CSS}
         grid.insertAdjacentHTML('beforeend', html);
       }
 
-      // --- Spreadsheet view: one row per entry, sorted chronologically. ---
+      // --- Spreadsheet view: one row per entry, sorted chronologically,
+      // split into three sections so the table opens compact:
+      //   - past entries, hidden by default behind "Show earlier"
+      //   - this week (today through the next 6 days), always visible
+      //   - later entries, hidden by default behind "Show later"
       function buildSheet() {
         sheetBuilt = true;
+
+        var todayDate = new Date(TODAY_ISO + 'T00:00:00Z');
+        var weekEndDate = new Date(todayDate);
+        weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
+        var weekEndIso = weekEndDate.toISOString().slice(0, 10);
+
         var sorted = MY_ENTRIES.slice().sort(function (a, b) {
           return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
         });
-        var body = document.getElementById('sheetBody');
-        if (!sorted.length) {
-          body.innerHTML = '<tr><td colspan="6" class="sheet-empty">Nothing tagged to you yet.</td></tr>';
-          return;
-        }
-        body.innerHTML = sorted.map(function (e) {
+
+        var pastRows = [], weekRows = [], laterRows = [];
+        sorted.forEach(function (e) {
+          if (e.date < TODAY_ISO) pastRows.push(e);
+          else if (e.date <= weekEndIso) weekRows.push(e);
+          else laterRows.push(e);
+        });
+
+        function rowHtml(e) {
           var d = new Date(e.date + 'T00:00:00Z');
           var dayLabel = d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
           var dateLabel = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
-          var rowClass = e.date === TODAY_ISO ? 'today-row' : (e.date < TODAY_ISO ? 'past-row' : '');
+          var isToday = e.date === TODAY_ISO;
+          var rowClass = isToday ? 'today-row' : (e.date < TODAY_ISO ? 'past-row' : '');
+          var badge = isToday ? '<span class="today-badge">TODAY</span>' : '';
           return '<tr class="' + rowClass + '">' +
-            '<td>' + escHtml(dateLabel) + '</td>' +
+            '<td>' + escHtml(dateLabel) + badge + '</td>' +
             '<td>' + escHtml(dayLabel) + '</td>' +
             '<td><span class="sheet-swatch" style="background:' + e.colour + '"></span>' + escHtml(e.programme) + '</td>' +
             '<td>' + escHtml(e.status) + '</td>' +
             '<td>' + escHtml(e.title) + '</td>' +
             '<td class="sheet-notes-cell">' + escHtml(e.notes) + '</td>' +
           '</tr>';
-        }).join('');
+        }
+        function emptyRow(msg) {
+          return '<tr><td colspan="6" class="sheet-empty">' + escHtml(msg) + '</td></tr>';
+        }
+
+        document.getElementById('sheetPastBody').innerHTML = pastRows.length ? pastRows.map(rowHtml).join('') : '';
+        document.getElementById('sheetWeekBody').innerHTML = weekRows.length ? weekRows.map(rowHtml).join('') : emptyRow('Nothing scheduled this week.');
+        document.getElementById('sheetLaterBody').innerHTML = laterRows.length ? laterRows.map(rowHtml).join('') : '';
+
+        var pastBody = document.getElementById('sheetPastBody');
+        var laterBody = document.getElementById('sheetLaterBody');
+        var earlierBtn = document.getElementById('sheetShowEarlierBtn');
+        var laterBtn = document.getElementById('sheetShowLaterBtn');
+
+        if (pastRows.length) {
+          pastBody.style.display = 'none';
+          earlierBtn.style.display = '';
+          earlierBtn.textContent = '\u2191 Show earlier (' + pastRows.length + ')';
+          earlierBtn.onclick = function () {
+            var nowHidden = pastBody.style.display !== 'none';
+            pastBody.style.display = nowHidden ? 'none' : '';
+            earlierBtn.textContent = (nowHidden ? '\u2191 Show earlier (' : '\u2193 Hide earlier (') + pastRows.length + ')';
+          };
+        } else {
+          earlierBtn.style.display = 'none';
+        }
+
+        if (laterRows.length) {
+          laterBody.style.display = 'none';
+          laterBtn.style.display = '';
+          laterBtn.textContent = '\u2193 Show later (' + laterRows.length + ')';
+          laterBtn.onclick = function () {
+            var nowHidden = laterBody.style.display !== 'none';
+            laterBody.style.display = nowHidden ? 'none' : '';
+            laterBtn.textContent = (nowHidden ? '\u2193 Show later (' : '\u2191 Hide later (') + laterRows.length + ')';
+          };
+        } else {
+          laterBtn.style.display = 'none';
+        }
       }
 
       var initial = 'list';
@@ -1542,6 +1718,7 @@ ${THEME_PICKER_CSS}
 </body>
 </html>`;
 }
+
 
 
 // --- Annual Leave Tracker -------------------------------------------------
@@ -3205,12 +3382,12 @@ function renderVanCalendar(bookings, monthParam, email) {
     const chipsHtml = dayBookings
       .map(
         (b) =>
-          `<div class="cal-chip" title="${escapeHtml(b.driverName)} - ${escapeHtml(b.project)} - ${escapeHtml(b.destination)}">${escapeHtml(b.driverName)}</div>`
+          `<button type="button" class="cal-chip" data-id="${escapeHtml(b.id)}">${escapeHtml(b.driverName)}</button>`
       )
       .join("");
     const isToday = iso === todayIso ? " today" : "";
     cellsHtml += `<div class="cal-cell${isToday}">
-      <div class="cal-daynum">${day}</div>
+      <div class="cal-daynum">${day}${isToday ? ' <span class="today-badge">TODAY</span>' : ""}</div>
       ${chipsHtml}
     </div>`;
   }
@@ -3222,6 +3399,19 @@ function renderVanCalendar(bookings, monthParam, email) {
   const listHtml = upcoming.length
     ? upcoming.map((b) => renderVanBookingCard(b, email)).join("")
     : `<div class="empty">No upcoming bookings - the van is free.</div>`;
+
+  // Reduced booking data for the click-to-view modal, with the delete
+  // permission (same rule as renderVanBookingCard) pre-computed
+  // server-side per viewer.
+  const bookingsForJs = bookings.map((b) => ({
+    id: b.id,
+    driverName: b.driverName,
+    project: b.project,
+    destination: b.destination,
+    notes: b.notes || "",
+    when: `${formatVanDateTime(b.startDateTime)} \u2192 ${formatVanDateTime(b.endDateTime)}`,
+    canDelete: !!email && (email === b.bookedByEmail || ANNUAL_LEAVE_VIEWERS.has(email)),
+  }));
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -3237,34 +3427,114 @@ ${THEME_PICKER_CSS}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
-    padding: 16px;
+    padding: 16px 24px 40px;
     background: var(--bg);
     color: var(--text);
-    max-width: 640px;
+    max-width: 1180px;
+    width: 100%;
+    box-sizing: border-box;
   }
   a.back { display: inline-block; font-size: 13px; color: var(--text-dim); text-decoration: none; margin-bottom: 12px; }
   a.back:hover { text-decoration: underline; }
   h1 { font-size: 20px; margin: 0 0 4px 0; }
   .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
-  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .cal-nav a { font-size: 13px; color: var(--accent); text-decoration: none; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; }
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-nav a { font-size: 14px; color: var(--accent); text-decoration: none; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; }
   .cal-nav a:hover { text-decoration: underline; }
-  .cal-month-label { font-size: 15px; font-weight: 700; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .cal-weekday { font-size: 11px; color: var(--text-dim); text-align: center; padding-bottom: 4px; }
-  .cal-cell { min-height: 64px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px; font-size: 10px; overflow: hidden; }
+  .cal-month-label { font-size: 18px; font-weight: 700; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-weekday { font-size: 12px; color: var(--text-dim); text-align: center; padding-bottom: 6px; font-weight: 600; }
+  .cal-cell { min-height: 130px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px; font-size: 12px; overflow: hidden; }
   .cal-cell.empty-cell { background: transparent; border: none; }
-  .cal-cell.today { border-color: var(--accent); border-width: 2px; }
-  .cal-daynum { font-size: 11px; color: var(--text-dim); font-weight: 600; margin-bottom: 2px; }
-  .cal-chip { background: var(--accent); color: #fff; border-radius: 4px; padding: 1px 4px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-cell.today { border-color: var(--accent); border-width: 2px; background: var(--surface-hover); }
+  .cal-daynum { font-size: 12px; color: var(--text-dim); font-weight: 700; margin-bottom: 4px; }
+  .cal-cell.today .cal-daynum { color: var(--accent); }
+  .today-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .cal-chip {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 3px 6px;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11.5px;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    display: block;
+    font-family: inherit;
+  }
+  .cal-chip:hover { filter: brightness(0.93); }
   h2.section { font-size: 14px; margin: 24px 0 8px; }
-  .van-booking-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+  .van-booking-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; max-width: 640px; }
   .van-booking-when { font-weight: 600; }
   .van-booking-who { color: var(--text-dim); margin-top: 2px; }
   .van-booking-where { color: var(--text-dim); margin-top: 2px; }
   .van-delete-btn { margin-top: 8px; background: none; border: 1px solid #c0392b; color: #c0392b; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
   .van-delete-btn:hover { background: #c0392b; color: #fff; }
-  .empty { color: var(--text-dim); font-size: 13px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .empty { color: var(--text-dim); font-size: 13px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; max-width: 640px; }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    max-width: 400px;
+    width: 100%;
+    color: var(--text);
+  }
+  .modal-box h3 { margin: 0 0 12px; font-size: 17px; }
+  .modal-row { font-size: 13.5px; margin-bottom: 8px; line-height: 1.4; }
+  .modal-row strong { color: var(--text-dim); font-weight: 600; margin-right: 4px; }
+  .modal-close {
+    margin-top: 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .modal-close:hover { opacity: 0.9; }
+  .modal-delete {
+    margin-top: 8px;
+    background: none;
+    border: 1px solid #c0392b;
+    color: #c0392b;
+    border-radius: 6px;
+    padding: 9px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .modal-delete:hover { background: #c0392b; color: #fff; }
 </style>
 </head>
 <body>
@@ -3278,7 +3548,7 @@ ${THEME_PICKER_CSS}
     <div class="cal-month-label">${escapeHtml(monthLabel)}</div>
     <a href="/van-calendar?month=${nextParam}">Next &rarr;</a>
   </div>
-  <div class="cal-grid">
+  <div class="cal-grid" id="calGrid">
     <div class="cal-weekday">Mon</div><div class="cal-weekday">Tue</div><div class="cal-weekday">Wed</div>
     <div class="cal-weekday">Thu</div><div class="cal-weekday">Fri</div><div class="cal-weekday">Sat</div><div class="cal-weekday">Sun</div>
     ${cellsHtml}
@@ -3287,12 +3557,68 @@ ${THEME_PICKER_CSS}
   <h2 class="section">Upcoming bookings</h2>
   ${listHtml}
 
+  <div class="modal-overlay" id="bookingModal">
+    <div class="modal-box">
+      <h3 id="bookingModalTitle"></h3>
+      <div id="bookingModalBody"></div>
+      <button type="button" class="modal-delete" id="bookingModalDelete" style="display:none;">Delete booking</button>
+      <button type="button" class="modal-close" id="bookingModalClose">Close</button>
+    </div>
+  </div>
+
   ${THEME_PICKER_SCRIPT}
   ${SCROLL_RESTORE_SCRIPT}
   ${VAN_DELETE_SCRIPT}
+  <script>
+    (function () {
+      var BOOKINGS = ${JSON.stringify(bookingsForJs).replace(/</g, "\\u003c")};
+      var BOOKINGS_BY_ID = {};
+      BOOKINGS.forEach(function (b) { BOOKINGS_BY_ID[b.id] = b; });
+
+      function escHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+
+      var modal = document.getElementById('bookingModal');
+      var modalTitle = document.getElementById('bookingModalTitle');
+      var modalBody = document.getElementById('bookingModalBody');
+      var modalDelete = document.getElementById('bookingModalDelete');
+
+      function openBookingModal(b) {
+        modalTitle.textContent = b.driverName || 'Booking';
+        modalBody.innerHTML =
+          '<div class="modal-row"><strong>When:</strong>' + escHtml(b.when) + '</div>' +
+          '<div class="modal-row"><strong>Project:</strong>' + escHtml(b.project) + '</div>' +
+          '<div class="modal-row"><strong>Destination:</strong>' + escHtml(b.destination) + '</div>' +
+          (b.notes ? '<div class="modal-row"><strong>Notes:</strong>' + escHtml(b.notes) + '</div>' : '');
+        if (b.canDelete) {
+          modalDelete.style.display = '';
+          modalDelete.onclick = function () { deleteVanBooking(b.id); };
+        } else {
+          modalDelete.style.display = 'none';
+          modalDelete.onclick = null;
+        }
+        modal.classList.add('open');
+      }
+      function closeModal() { modal.classList.remove('open'); }
+      document.getElementById('bookingModalClose').addEventListener('click', closeModal);
+      modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+      document.getElementById('calGrid').addEventListener('click', function (e) {
+        var chip = e.target.closest ? e.target.closest('.cal-chip') : null;
+        if (!chip) return;
+        var b = BOOKINGS_BY_ID[chip.getAttribute('data-id')];
+        if (b) openBookingModal(b);
+      });
+    })();
+  </script>
 </body>
 </html>`;
 }
+
 
 // Mirrors renderMyRequests (annual leave) for van requests.
 function renderMyVanRequests(personName, requests) {
