@@ -4520,6 +4520,21 @@ export default {
         logs.push(newLog);
         await saveVanLogs(env, logs);
 
+        const damageFlagText = damage ? `Yes \u2014 ${damage}` : "No";
+        ctx.waitUntil(
+          sendMail(
+            env,
+            ["iestyn@carlamltd.com"],
+            `Van ${type === "checkout" ? "checkout" : "return"} logged - ${personName}`,
+            `<p><strong>${escapeHtml(personName)}</strong> logged a van ${type === "checkout" ? "checkout" : "return"}.</p>
+             <p><strong>Date:</strong> ${escapeHtml(formatVanDateOnly(date))}<br>
+             <strong>Mileage:</strong> ${escapeHtml(String(mileage))}<br>
+             <strong>Fuel level:</strong> ${escapeHtml(fuelLevel)}<br>
+             <strong>Damage noted:</strong> ${escapeHtml(damageFlagText)}</p>
+             <p><a href="https://carlam-schedule.iestyn-041.workers.dev/van-logs">View the full log</a></p>`
+          )
+        );
+
         return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
       }
 
