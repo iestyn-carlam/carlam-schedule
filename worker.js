@@ -910,7 +910,7 @@ function renderIndex(email, syncedAt, headlines, syncedAtIso, incidentInfo) {
   const vanLinks = [];
 
   if (email && EMAIL_TO_NAME[email]) {
-    myScheduleLinks.push(["My Schedule", "my-schedule", "Just your own tasks, day by day"]);
+    myScheduleLinks.push(["My Schedule", "my-schedule", "List, calendar, or spreadsheet view of your own tasks"]);
     myScheduleLinks.push(["My Annual Leave", "my-annual-leave", "Days used, remaining, and your reset date"]);
     myScheduleLinks.push(["Request Annual Leave", "request-leave", "Submit a new leave request"]);
     myScheduleLinks.push(["My Leave Requests", "my-leave-requests", "Track the status of your requests"]);
@@ -1180,6 +1180,7 @@ function entryColour(status, programme) {
 function renderPersonalSchedule(personName, rows, syncedAt) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const todayIso = today.toISOString().slice(0, 10);
 
   const myRows = rows
     .filter((r) => r.start_date && Array.isArray(r.people) && r.people.includes(personName))
@@ -1208,8 +1209,8 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
     </div>`;
   }
 
-  const pastRows = myRows.filter((r) => r.start_date < today.toISOString().slice(0, 10));
-  const currentRows = myRows.filter((r) => r.start_date >= today.toISOString().slice(0, 10));
+  const pastRows = myRows.filter((r) => r.start_date < todayIso);
+  const currentRows = myRows.filter((r) => r.start_date >= todayIso);
 
   let itemsHtml;
   if (myRows.length === 0) {
@@ -1224,6 +1225,20 @@ function renderPersonalSchedule(personName, rows, syncedAt) {
       : `<div class="empty">Nothing upcoming right now.</div>`;
     itemsHtml = `${pastToggleHtml}${currentHtml}`;
   }
+
+  // Same rows, reduced to just what the calendar/spreadsheet client script
+  // needs, with colour pre-computed server-side (same entryColour() used
+  // by the list view and every other schedule page) so the three views
+  // always agree on colour even though calendar/spreadsheet are built by
+  // the small client script below rather than server-rendered.
+  const entriesForJs = myRows.map((r) => ({
+    date: r.start_date,
+    programme: r.programme || "",
+    status: r.status || "",
+    title: r.title || "",
+    notes: r.notes || "",
+    colour: entryColour(r.status, r.programme),
+  }));
 
   const generatedAt = syncedAt ? escapeHtml(syncedAt) : "";
 
@@ -1244,7 +1259,7 @@ ${THEME_PICKER_CSS}
     padding: 16px;
     background: var(--bg);
     color: var(--text);
-    max-width: 560px;
+    max-width: 680px;
   }
   .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   a.back {
@@ -1255,7 +1270,23 @@ ${THEME_PICKER_CSS}
   }
   a.back:hover { text-decoration: underline; }
   h1 { font-size: 20px; margin: 0 0 4px 0; }
-  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  .meta { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; }
+
+  .view-tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .view-tab {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .view-tab:hover { color: var(--text); }
+  .view-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
   .entry { margin-bottom: 10px; }
   .entry-date { font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 4px; }
   .entry-body {
@@ -1285,6 +1316,40 @@ ${THEME_PICKER_CSS}
   .past-toggle:hover { background: var(--surface-hover); }
   .past-entries { display: none; margin-bottom: 14px; }
   .past-entries.visible { display: block; }
+
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-nav a { font-size: 13px; color: var(--accent); text-decoration: none; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+  .cal-nav a:hover { text-decoration: underline; }
+  .cal-month-label { font-size: 15px; font-weight: 700; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-weekday { font-size: 11px; color: var(--text-dim); text-align: center; padding-bottom: 4px; }
+  .cal-cell { min-height: 72px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px; font-size: 10px; overflow: hidden; }
+  .cal-cell.empty-cell { background: transparent; border: none; }
+  .cal-cell.today { border-color: var(--accent); border-width: 2px; }
+  .cal-daynum { font-size: 11px; color: var(--text-dim); font-weight: 600; margin-bottom: 2px; }
+  .cal-chip { color: #1a1a1a; border-radius: 4px; padding: 1px 4px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .sheet-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+  table.sheet-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 520px; }
+  table.sheet-table th, table.sheet-table td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.sheet-table td.sheet-notes-cell, table.sheet-table th.sheet-notes-th { white-space: normal; }
+  table.sheet-table th {
+    background: var(--surface);
+    color: var(--text-dim);
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+  }
+  table.sheet-table tbody tr:nth-child(even) { background: var(--surface); }
+  table.sheet-table tr.today-row td { font-weight: 700; }
+  table.sheet-table tr.past-row td { opacity: 0.55; }
+  .sheet-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .sheet-empty { color: var(--text-dim); font-style: italic; white-space: normal; }
 </style>
 </head>
 <body>
@@ -1292,27 +1357,192 @@ ${THEME_PICKER_CSS}
   <a class="back" href="index.html">&larr; All schedules</a>
   <h1>My Schedule</h1>
   <div class="meta">${escapeHtml(personName)} &middot; synced ${generatedAt} &middot; refreshes automatically every 2 minutes</div>
-  ${itemsHtml}
+
+  <div class="view-tabs">
+    <button type="button" class="view-tab" data-view="list">List</button>
+    <button type="button" class="view-tab" data-view="calendar">Calendar</button>
+    <button type="button" class="view-tab" data-view="sheet">Spreadsheet</button>
+  </div>
+
+  <div class="view-panel" id="view-list">
+    ${itemsHtml}
+  </div>
+
+  <div class="view-panel" id="view-calendar" style="display:none;">
+    <div class="cal-nav">
+      <a href="#" id="calPrev">&larr; Prev</a>
+      <div class="cal-month-label" id="calMonthLabel"></div>
+      <a href="#" id="calNext">Next &rarr;</a>
+    </div>
+    <div class="cal-grid" id="calGrid">
+      <div class="cal-weekday">Mon</div><div class="cal-weekday">Tue</div><div class="cal-weekday">Wed</div>
+      <div class="cal-weekday">Thu</div><div class="cal-weekday">Fri</div><div class="cal-weekday">Sat</div><div class="cal-weekday">Sun</div>
+    </div>
+  </div>
+
+  <div class="view-panel" id="view-sheet" style="display:none;">
+    <div class="sheet-wrap">
+      <table class="sheet-table">
+        <thead>
+          <tr>
+            <th>Date</th><th>Day</th><th>Programme</th><th>Status</th><th>Task</th><th class="sheet-notes-th">Notes</th>
+          </tr>
+        </thead>
+        <tbody id="sheetBody"></tbody>
+      </table>
+    </div>
+  </div>
+
   ${THEME_PICKER_SCRIPT}
   ${SCROLL_RESTORE_SCRIPT}
   <script>
     (function () {
       var btn = document.getElementById('pastToggle');
-      if (!btn) return;
-      btn.addEventListener('click', function () {
-        var panel = document.getElementById('pastEntries');
-        var beforeHeight = document.documentElement.scrollHeight;
-        var expanded = panel.classList.toggle('visible');
-        var afterHeight = document.documentElement.scrollHeight;
-        window.scrollBy(0, afterHeight - beforeHeight);
-        var count = panel.children.length;
-        this.textContent = expanded ? '\u2191 Hide earlier' : '\u2193 Show earlier (' + count + ')';
+      if (btn) {
+        btn.addEventListener('click', function () {
+          var panel = document.getElementById('pastEntries');
+          var beforeHeight = document.documentElement.scrollHeight;
+          var expanded = panel.classList.toggle('visible');
+          var afterHeight = document.documentElement.scrollHeight;
+          window.scrollBy(0, afterHeight - beforeHeight);
+          var count = panel.children.length;
+          this.textContent = expanded ? '\u2191 Hide earlier' : '\u2193 Show earlier (' + count + ')';
+        });
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      var MY_ENTRIES = ${JSON.stringify(entriesForJs).replace(/</g, "\\u003c")};
+      var TODAY_ISO = ${JSON.stringify(todayIso)};
+      var STORAGE_KEY = 'carlam_my_schedule_view';
+
+      function escHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('.view-tab'));
+      var panels = {
+        list: document.getElementById('view-list'),
+        calendar: document.getElementById('view-calendar'),
+        sheet: document.getElementById('view-sheet'),
+      };
+      var calendarBuilt = false;
+      var sheetBuilt = false;
+
+      function showView(name) {
+        if (!panels[name]) name = 'list';
+        Object.keys(panels).forEach(function (k) {
+          panels[k].style.display = k === name ? '' : 'none';
+        });
+        tabs.forEach(function (t) {
+          t.classList.toggle('active', t.getAttribute('data-view') === name);
+        });
+        try { localStorage.setItem(STORAGE_KEY, name); } catch (e) {}
+        if (name === 'calendar' && !calendarBuilt) buildCalendar();
+        if (name === 'sheet' && !sheetBuilt) buildSheet();
+      }
+
+      tabs.forEach(function (t) {
+        t.addEventListener('click', function () { showView(t.getAttribute('data-view')); });
       });
+
+      // --- Calendar view: a simple month grid, built and navigated
+      // entirely client-side from MY_ENTRIES, so switching months never
+      // needs a page reload. ---
+      var calYear, calMonth;
+      function buildCalendar() {
+        calendarBuilt = true;
+        var t = new Date(TODAY_ISO + 'T00:00:00Z');
+        calYear = t.getUTCFullYear();
+        calMonth = t.getUTCMonth();
+        renderCalendar();
+        document.getElementById('calPrev').addEventListener('click', function (e) {
+          e.preventDefault();
+          calMonth--;
+          if (calMonth < 0) { calMonth = 11; calYear--; }
+          renderCalendar();
+        });
+        document.getElementById('calNext').addEventListener('click', function (e) {
+          e.preventDefault();
+          calMonth++;
+          if (calMonth > 11) { calMonth = 0; calYear++; }
+          renderCalendar();
+        });
+      }
+      function renderCalendar() {
+        var byDate = {};
+        MY_ENTRIES.forEach(function (e) { (byDate[e.date] = byDate[e.date] || []).push(e); });
+
+        var firstOfMonth = new Date(Date.UTC(calYear, calMonth, 1));
+        var firstWeekday = (firstOfMonth.getUTCDay() + 6) % 7;
+        var daysInMonth = new Date(Date.UTC(calYear, calMonth + 1, 0)).getUTCDate();
+
+        document.getElementById('calMonthLabel').textContent =
+          firstOfMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+        var html = '';
+        for (var i = 0; i < firstWeekday; i++) html += '<div class="cal-cell empty-cell"></div>';
+        for (var day = 1; day <= daysInMonth; day++) {
+          var iso = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+          var dayEntries = byDate[iso] || [];
+          var chips = dayEntries.map(function (e) {
+            var label = [e.programme, e.status, e.title].filter(Boolean).join(' - ') || 'Untitled';
+            return '<div class="cal-chip" style="background:' + e.colour + '" title="' + escHtml(label) + '">' + escHtml(label) + '</div>';
+          }).join('');
+          var isToday = iso === TODAY_ISO ? ' today' : '';
+          html += '<div class="cal-cell' + isToday + '"><div class="cal-daynum">' + day + '</div>' + chips + '</div>';
+        }
+
+        // Keep the weekday header row, replace everything after it.
+        var grid = document.getElementById('calGrid');
+        var weekdayHeaders = Array.prototype.slice.call(grid.querySelectorAll('.cal-weekday'));
+        grid.innerHTML = '';
+        weekdayHeaders.forEach(function (h) { grid.appendChild(h); });
+        grid.insertAdjacentHTML('beforeend', html);
+      }
+
+      // --- Spreadsheet view: one row per entry, sorted chronologically. ---
+      function buildSheet() {
+        sheetBuilt = true;
+        var sorted = MY_ENTRIES.slice().sort(function (a, b) {
+          return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+        });
+        var body = document.getElementById('sheetBody');
+        if (!sorted.length) {
+          body.innerHTML = '<tr><td colspan="6" class="sheet-empty">Nothing tagged to you yet.</td></tr>';
+          return;
+        }
+        body.innerHTML = sorted.map(function (e) {
+          var d = new Date(e.date + 'T00:00:00Z');
+          var dayLabel = d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+          var dateLabel = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+          var rowClass = e.date === TODAY_ISO ? 'today-row' : (e.date < TODAY_ISO ? 'past-row' : '');
+          return '<tr class="' + rowClass + '">' +
+            '<td>' + escHtml(dateLabel) + '</td>' +
+            '<td>' + escHtml(dayLabel) + '</td>' +
+            '<td><span class="sheet-swatch" style="background:' + e.colour + '"></span>' + escHtml(e.programme) + '</td>' +
+            '<td>' + escHtml(e.status) + '</td>' +
+            '<td>' + escHtml(e.title) + '</td>' +
+            '<td class="sheet-notes-cell">' + escHtml(e.notes) + '</td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      var initial = 'list';
+      try {
+        var saved = localStorage.getItem(STORAGE_KEY);
+        if (saved && panels[saved]) initial = saved;
+      } catch (e) {}
+      showView(initial);
     })();
   </script>
 </body>
 </html>`;
 }
+
 
 // --- Annual Leave Tracker -------------------------------------------------
 // A genuinely editable page (not just a generated view) for a small named
