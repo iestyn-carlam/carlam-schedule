@@ -50,6 +50,7 @@ const ACCESS_MAP = {
   "owain@carlamltd.com": ["Digital", "Admin"],
   "rhodri@carlamltd.com": ["Digital", "Admin"],
   "wil@carlamltd.com": ["Digital", "Corporate", "Admin"],
+  "noa@carlamltd.com": ["Digital"],
 };
 
 // Maps each login email to the exact name used in Notion's "Person Name"
@@ -70,6 +71,7 @@ const EMAIL_TO_NAME = {
   "owain@carlamltd.com": "Owain Jones",
   "rhodri@carlamltd.com": "Rhodri Lewis",
   "wil@carlamltd.com": "Wil Williams",
+  "noa@carlamltd.com": "Noa Harries",
 };
 
 function decodeAccessEmail(request) {
