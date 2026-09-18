@@ -9,7 +9,7 @@
   },
    "triggers": {
      "crons": ["*/15 6-20 * * 1-5"]
-   }
+   },
   "kv_namespaces": [
     {
       "binding": "LEAVE_KV",
